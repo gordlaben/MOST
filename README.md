@@ -16,11 +16,9 @@
   <img src="public/github_logo.png" alt="Most Logo" width="128" height="128" />
 </p>
 
-In Slavic languages, the word "**most**" literally means "**bridge**" and stands for **Media Organizer for Stremio & Trakt**.
+**Most** (Media Organizer for Stremio & Trakt) is a self-hosted tool designed to give you better control over your Stremio library. It connects to Trakt.tv to organize your watchlist and lets you customize exactly how content appears in Stremio.
 
-**Most** acts as the intelligent bridge between **Trakt.tv** and **Stremio**, giving you full control over your streaming library. It bridges the gap by letting you curate exactly *what* lists are shown and *how* they look in Stremio.
-
-Beyond curation, Most revolutionizes how you watch TV. Instead of chasing weekly episodes, it helps you wait. It monitors your active shows and notifies you only when a season is **fully aired and ready to binge**.
+The project focuses on **User Experience** and **Performance**. Most provides a visual dashboard to manage your playlists exactly as they will appear in Stremio. Built with intelligent local caching, it ensures your catalogs load instantly on any device. Additional features like "Binge Ready" tracking help you filter content to only show series when a complete season is available.
 
 [Features](#features) • [Installation](#installation) • [Stremio](#stremio-integration) • [Configuration](#configuration)
 
@@ -35,25 +33,27 @@ Beyond curation, Most revolutionizes how you watch TV. Instead of chasing weekly
 
 <!-- Gallery -->
 <p align="center">
-  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="30%" />
-  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="30%" />
-  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="30%" />
+  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="45%" />
+  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="45%" />
+</p>
+<p align="center">
+  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="45%" />
+  <img src="public/screenshots/item_details.jpg" alt="Item Details" width="45%" />
 </p>
 
 ---
 
 ## ✨ Features
 
-*   **🎬 Stremio Addon**: Native integration with Stremio. Adds "Binge Ready" and "Episodes Left" catalogs directly to your streaming hub.
-*   **🖥️ WYSIWYG Dashboard**: The Web UI mirrors your Stremio experience. Actively monitor and manage your lists in the browser to see precisely what will appear on your TV.
-*   **🖼️ Smart List Covers**: Inject visual "List Cover" items at the start of your Stremio rows. These act as clear headers, helping you instantly distinguish between your "Binge Ready" and "Episodes Left" lists while scrolling.
-*   **🔄 Two-Way Sync**: Seamlessly syncs your watchlist and watched history with Trakt.tv.
-*   **📝 Custom List Creation**: Generate and populate your own custom lists directly within Most. Any list created in Most is automatically synced back to Trakt.tv.
-*   **👥 Multi-Profile**: Create separate profiles for every member of the household, each with their own Trakt account and preferences.
-*   **🎯 Binge Ready Logic**: Intelligently calculates season finale dates. A show only appears in your "Binge Ready" list when the *entire* season has aired.
-*   **📅 Smart Calendar Feed**: Generates a personal `.ics` subscription link for Google/Apple Calendar. See exactly when your shows become binge-able.
-*   **⚡ Local Caching**: Built for speed. Most caches all metadata and **RPDB posters** locally to avoid repeated API calls. This ensures your Stremio lists load *instantly*, serving content directly from your server instead of waiting for external APIs.
-*   **🛡️ Privacy First**: Self-hosted. Your data stays on your server.
+*   **🎬 Stremio Integration**: Native addon that feeds your curated lists directly into Stremio.
+*   **🖥️ Web Dashboard**: Manage your lists in a browser interface that mimics the Stremio UI.
+*   **🎯 Binge Tracking**: Filters shows based on air dates. Shows only appear in "Binge Ready" when a full season has finished airing.
+*   **🖼️ List Headers**: Injects visual separators (covers) in Stremio so you can easily distinguish between lists while scrolling.
+*   **🔄 Trakt Sync**: Full two-way synchronization for watchlists, history, and custom lists.
+*   **👥 Multi-User**: Support for multiple profiles, each with their own Trakt account.
+*   **📅 Calendar**: Provides an `.ics` feed for your calendar apps to track upcoming binge dates.
+*   **⚡ Performance**: Aggressive local caching for metadata and images (RPDB) to ensure instant list loading and avoid API rate limits.
+*   **🛡️ Self-Hosted**: Run it on your own hardware. Your data stays with you.
 
 ---
 
