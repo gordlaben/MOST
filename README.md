@@ -44,13 +44,14 @@ Beyond curation, Most revolutionizes how you watch TV. Instead of chasing weekly
 
 ## ✨ Features
 
+*   **🎬 Stremio Addon**: Native integration with Stremio. Adds "Binge Ready" and "Episodes Left" catalogs directly to your streaming hub.
+*   **🖥️ WYSIWYG Dashboard**: The Web UI mirrors your Stremio experience. Actively monitor and manage your lists in the browser to see precisely what will appear on your TV.
+*   **🖼️ Smart List Covers**: Inject visual "List Cover" items at the start of your Stremio rows. These act as clear headers, helping you instantly distinguish between your "Binge Ready" and "Episodes Left" lists while scrolling.
+*   **🔄 Two-Way Sync**: Seamlessly syncs your watchlist and watched history with Trakt.tv.
+*   **📝 Custom List Creation**: Generate and populate your own custom lists directly within Most. Any list created in Most is automatically synced back to Trakt.tv.
+*   **👥 Multi-Profile**: Create separate profiles for every member of the household, each with their own Trakt account and preferences.
 *   **🎯 Binge Ready Logic**: Intelligently calculates season finale dates. A show only appears in your "Binge Ready" list when the *entire* season has aired.
 *   **📅 Smart Calendar Feed**: Generates a personal `.ics` subscription link for Google/Apple Calendar. See exactly when your shows become binge-able.
-*   **🎬 Stremio Addon**: Native integration with Stremio. Adds "Binge Ready" and "Episodes Left" catalogs directly to your streaming hub.
-*   **�️ WYSIWYG Dashboard**: The Web UI mirrors your Stremio experience. Actively monitor and manage your lists in the browser to see precisely what will appear on your TV.
-*   **🖼️ Smart List Covers**: Inject visual "List Cover" items at the start of your Stremio rows. These act as clear headers, helping you instantly distinguish between your "Binge Ready" and "Episodes Left" lists while scrolling.
-*   **�🔄 Two-Way Sync**: Seamlessly syncs your watchlist and watched history with Trakt.tv.
-*   **👥 Multi-Profile**: Create separate profiles for every member of the household, each with their own Trakt account and preferences.
 *   **⚡ Local Caching**: Built for speed. Most caches all metadata and **RPDB posters** locally to avoid repeated API calls. This ensures your Stremio lists load *instantly*, serving content directly from your server instead of waiting for external APIs.
 *   **🛡️ Privacy First**: Self-hosted. Your data stays on your server.
 
