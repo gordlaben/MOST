@@ -5,6 +5,10 @@
 **Media Organizer for Stremio & Trakt**
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/gordlaben/most)](https://hub.docker.com/r/gordlaben/most)
+[![Docker Image Version](https://img.shields.io/docker/v/gordlaben/most?sort=date)](https://hub.docker.com/r/gordlaben/most)
+[![Docker Image Size](https://img.shields.io/docker/image-size/gordlaben/most?sort=date)](https://hub.docker.com/r/gordlaben/most)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289DA?style=flat&logo=discord&logoColor=white)](https://discord.gg/J5MSkJk7C6)
+<br/>
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Trakt.tv](https://img.shields.io/badge/Data-Trakt.tv-red)](https://trakt.tv)
 
@@ -12,7 +16,7 @@
   <img src="public/logo.png" alt="Most Logo" width="128" height="128" />
 </p>
 
-In Slavic languages, the word "**most**" literally means "**bridge**."
+In Slavic languages, the word "**most**" literally means "**bridge**" and stands for **Media Organizer for Stremio & Trakt**.
 
 **Most** acts as the intelligent bridge between **Trakt.tv** and **Stremio**, giving you full control over your streaming library. It bridges the gap by letting you curate exactly *what* lists are shown and *how* they look in Stremio.
 
@@ -21,6 +25,20 @@ Beyond curation, Most revolutionizes how you watch TV. Instead of chasing weekly
 [Features](#features) • [Installation](#installation) • [Stremio](#stremio-integration) • [Configuration](#configuration)
 
 </div>
+
+<br />
+
+<!-- Main Screenshot -->
+<p align="center">
+  <img src="public/screenshots/homepage.jpg" alt="Most Dashboard" width="100%">
+</p>
+
+<!-- Gallery -->
+<p align="center">
+  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="30%" />
+  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="30%" />
+  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="30%" />
+</p>
 
 ---
 
@@ -175,3 +193,14 @@ Never miss a binge date. Most provides a standard ICS subscription link.
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## ⚖️ Disclaimer
+
+**Most** is a dedicated metadata management tool designed solely for organizing personal watch history and lists via integration with the Trakt.tv API.
+
+This software **does not** host, distribute, index, or provide access to any copyrighted audio/visual content, streams, torrents, or magnet links. It operates strictly as a metadata aggregator and organizational utility. The developers of Most do not condone, endorse, or facilitate piracy in any form.
+
+Users are solely responsible for ensuring their use of this software complies with all applicable local, federal, and international laws and regulations regarding copyright and media rights. The developers accept no liability for any potential misuse of this application.
+
