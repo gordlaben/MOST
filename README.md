@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**The TV Show Tracker for Patient Watchers**
+**Media Organizer for Stremio & Trakt**
 
 [![Docker Pulls](https://img.shields.io/docker/pulls/gordlaben/most)](https://hub.docker.com/r/gordlaben/most)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,7 +12,11 @@
   <img src="public/logo.png" alt="Most Logo" width="128" height="128" />
 </p>
 
-Most is a self-hosted Next.js application that revolutionizes how you track TV shows. Instead of chasing weekly episodes, **Most** helps you wait. It monitors your active shows and notifies you only when a season is **fully aired and ready to binge**.
+In Slavic languages, the word "**most**" literally means "**bridge**."
+
+**Most** acts as the intelligent bridge between **Trakt.tv** and **Stremio**, giving you full control over your streaming library. It bridges the gap by letting you curate exactly *what* lists are shown and *how* they look in Stremio.
+
+Beyond curation, Most revolutionizes how you watch TV. Instead of chasing weekly episodes, it helps you wait. It monitors your active shows and notifies you only when a season is **fully aired and ready to binge**.
 
 [Features](#features) • [Installation](#installation) • [Stremio](#stremio-integration) • [Configuration](#configuration)
 
@@ -25,10 +29,11 @@ Most is a self-hosted Next.js application that revolutionizes how you track TV s
 *   **🎯 Binge Ready Logic**: Intelligently calculates season finale dates. A show only appears in your "Binge Ready" list when the *entire* season has aired.
 *   **📅 Smart Calendar Feed**: Generates a personal `.ics` subscription link for Google/Apple Calendar. See exactly when your shows become binge-able.
 *   **🎬 Stremio Addon**: Native integration with Stremio. Adds "Binge Ready" and "Episodes Left" catalogs directly to your streaming hub.
-*   **🔄 Two-Way Sync**: Seamlessly syncs your watchlist and watched history with Trakt.tv.
+*   **�️ WYSIWYG Dashboard**: The Web UI mirrors your Stremio experience. Actively monitor and manage your lists in the browser to see precisely what will appear on your TV.
+*   **🖼️ Smart List Covers**: Inject visual "List Cover" items at the start of your Stremio rows. These act as clear headers, helping you instantly distinguish between your "Binge Ready" and "Episodes Left" lists while scrolling.
+*   **�🔄 Two-Way Sync**: Seamlessly syncs your watchlist and watched history with Trakt.tv.
 *   **👥 Multi-Profile**: Create separate profiles for every member of the household, each with their own Trakt account and preferences.
-*   **📱 PWA Ready**: Install on your phone or desktop as a native-like app.
-*   **⚡ Local Caching**: Fast UI responsiveness and reduced API usage thanks to a local SQLite database and smart caching.
+*   **⚡ Local Caching**: Built for speed. Most caches all metadata and **RPDB posters** locally to avoid repeated API calls. This ensures your Stremio lists load *instantly*, serving content directly from your server instead of waiting for external APIs.
 *   **🛡️ Privacy First**: Self-hosted. Your data stays on your server.
 
 ---
@@ -68,6 +73,12 @@ services:
       
       # Required: Your public URL for Stremio/Calendar links
       - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+      # Optional: Used to ensure correct image proxy links and redirects
+      - APP_URL=http://localhost:3000
+
+      # Optional: Secure the /admin dashboard
+      - ADMIN_PASSWORD=secure_password
     volumes:
       - ./data:/app/data
 ```
@@ -124,6 +135,7 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 |----------|-------------|---------|
 | `DATABASE_URL` | Connection string for Prisma. Use `file:/app/data/prod.db` for SQLite in Docker. | `file:./dev.db` |
 | `NEXT_PUBLIC_BASE_URL` | The public URL of your installation. Used for generating calendar and Stremio links. | `http://localhost:3000` |
+| `APP_URL` | Used internally to construct absolute URLs (e.g. for Stremio manifests) and fix image proxy redirects. | `http://localhost:3000` |
 | `TRAKT_CLIENT_ID` | Your Trakt.tv Application Client ID. | - |
 | `TRAKT_CLIENT_SECRET` | Your Trakt.tv Application Client Secret. | - |
 | `ADMIN_PASSWORD` | (Optional) Password for accessing the `/admin` dashboard to manage users. | - |
