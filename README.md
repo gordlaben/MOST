@@ -30,17 +30,17 @@ It also helps you wait. Instead of checking every week for new episodes, the "Bi
 
 <!-- Main Screenshot -->
 <p align="center">
-  <img src="public/screenshots/homepage.jpg" alt="Most Dashboard" width="100%">
+  <img src="public/screenshots/homepage.jpg" alt="Most Dashboard" width="98%">
 </p>
 
 <!-- Gallery -->
 <p align="center">
-  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="23%" />
-  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="23%" />
+  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="46%" />
+  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="46%" />
 </p>
 <p align="center">
-  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="23%" />
-  <img src="public/screenshots/item_details.jpg" alt="Item Details" width="23%" />
+  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="46%" />
+  <img src="public/screenshots/item_details.jpg" alt="Item Details" width="46%" />
 </p>
 
 ---
