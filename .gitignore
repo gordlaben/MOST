@@ -45,3 +45,6 @@ next-env.d.ts
 data/
 
 *.db
+
+# maintainer scripts
+build_and_push.ps1
