@@ -16,9 +16,11 @@
   <img src="public/github_logo.png" alt="Most Logo" width="128" height="128" />
 </p>
 
-**Most** (Media Organizer for Stremio & Trakt) is a self-hosted tool designed to give you better control over your Stremio library. It connects to Trakt.tv to organize your watchlist and lets you customize exactly how content appears in Stremio.
+**Most** (Media Organizer for Stremio & Trakt) is a self-hosted dashboard that gives you full control over your Stremio library.
 
-The project focuses on **User Experience** and **Performance**. Most provides a visual dashboard to manage your playlists exactly as they will appear in Stremio. Built with intelligent local caching, it ensures your catalogs load instantly on any device. Additional features like "Binge Ready" tracking help you filter content to only show series when a complete season is available.
+It solves the problem of messy, slow-loading catalogs. With Most, you can visually organize your Trakt lists exactly how you want them to appear on your TV. It runs locally to cache metadata and images, making your Stremio add-ons load instantly.
+
+It also helps you wait. Instead of checking every week for new episodes, the "Binge Ready" filter only shows you series that have finished airing a complete season.
 
 [Features](#features) • [Installation](#installation) • [Stremio](#stremio-integration) • [Configuration](#configuration)
 
@@ -33,27 +35,27 @@ The project focuses on **User Experience** and **Performance**. Most provides a 
 
 <!-- Gallery -->
 <p align="center">
-  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="45%" />
-  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="45%" />
+  <img src="public/screenshots/compact_mode.jpg" alt="Compact Mode" width="50%" />
+  <img src="public/screenshots/list_cover_example.jpg" alt="List Covers in Stremio" width="50%" />
 </p>
 <p align="center">
-  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="45%" />
-  <img src="public/screenshots/item_details.jpg" alt="Item Details" width="45%" />
+  <img src="public/screenshots/single_list_page.jpg" alt="List Details" width="50%" />
+  <img src="public/screenshots/item_details.jpg" alt="Item Details" width="50%" />
 </p>
 
 ---
 
 ## ✨ Features
 
-*   **🎬 Stremio Integration**: Native addon that feeds your curated lists directly into Stremio.
-*   **🖥️ Web Dashboard**: Manage your lists in a browser interface that mimics the Stremio UI.
-*   **🎯 Binge Tracking**: Filters shows based on air dates. Shows only appear in "Binge Ready" when a full season has finished airing.
-*   **🖼️ List Headers**: Injects visual separators (covers) in Stremio so you can easily distinguish between lists while scrolling.
-*   **🔄 Trakt Sync**: Full two-way synchronization for watchlists, history, and custom lists.
-*   **👥 Multi-User**: Support for multiple profiles, each with their own Trakt account.
-*   **📅 Calendar**: Provides an `.ics` feed for your calendar apps to track upcoming binge dates.
-*   **⚡ Performance**: Aggressive local caching for metadata and images (RPDB) to ensure instant list loading and avoid API rate limits.
-*   **🛡️ Self-Hosted**: Run it on your own hardware. Your data stays with you.
+*   **🎬 Native Stremio Addon**: Feeds your curated lists directly into your streaming hub.
+*   **🖥️ Visual Dashboard**: Manage your lists in a browser interface that looks and feels like Stremio.
+*   **🎯 Binge Tracking**: Filters your watchlist. Shows only appear when a full season has finished airing.
+*   **🖼️ List Headers**: Injects visual separators (covers) in Stremio so you can easily tell your lists apart while scrolling.
+*   **🔄 Two-Way Sync**: Everything you do in Most syncs back to Trakt.tv, and vice versa.
+*   **👥 Multi-User**: Supports multiple profiles, so everyone in the house can use their own Trakt account.
+*   **📅 Calendar Feed**: Generates a personal `.ics` link for your calendar apps so you know when a binge is coming up.
+*   **⚡ Local Caching**: Caches metadata and RPDB posters locally. Your lists load instantly because they aren't waiting for external APIs.
+*   **🛡️ Privacy**: Self-hosted. Your data stays on your server.
 
 ---
 
