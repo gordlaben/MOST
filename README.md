@@ -163,13 +163,11 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 ## 📺 Integrations
 
 ### Stremio Integration
-Most acts as a Stremio addon server. To add it to Stremio:
+Most acts as a Stremio addon. To add it to Stremio:
 1.  Log in to your Most dashboard.
 2.  Click the **Stremio** button in the navigation or settings.
 3.  Click "Install on Stremio".
-4.  This adds two new catalogs to your Stremio Board:
-    *   **Binge Ready**: Shows with completed seasons waiting for you.
-    *   **Episodes Left**: Shows you are currently in the middle of watching.
+4.  Go back to the Dashboard and enjoy your freshly created Lists ❤️
 
 ### Calendar Feed
 Never miss a binge date. Most provides a standard ICS subscription link.
