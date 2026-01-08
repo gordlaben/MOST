@@ -1,0 +1,179 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Setting {
+  key   String @id
+  value String
+}
+
+// Models for caching Trakt data
+model Show {
+  traktId       Int      @id
+  title         String
+  slug          String
+  tvdbId        Int?
+  tmdbId        Int?
+  imdbId        String?
+  overview      String?
+  year          Int?
+  runtime       Int?
+  genres        String? // JSON string array
+  certification String?
+  network       String?
+  status        String?
+  rating        Float?
+  votes         Int?
+  trailer       String?
+  homepage      String?
+  language      String?
+  images        String? // JSON string for image URLs
+  updatedAt     DateTime @updatedAt
+  seasons       Season[]
+  listItems     TraktListItem[]
+  watchedEntries WatchedEntry[]
+}
+
+model Movie {
+  traktId       Int      @id
+  title         String
+  slug          String
+  imdbId        String?
+  tmdbId        Int?
+  overview      String?
+  year          Int?
+  released      String?
+  runtime       Int?
+  tagline       String?
+  genres        String? // JSON string array
+  certification String?
+  status        String?
+  rating        Float?
+  votes         Int?
+  trailer       String?
+  homepage      String?
+  language      String?
+  images        String? // JSON string for image URLs
+  updatedAt     DateTime @updatedAt
+  listItems     TraktListItem[]
+  watchedEntries WatchedEntry[]
+}
+model Season {
+  id        Int       @id @default(autoincrement())
+  number    Int
+  showId    Int
+  show      Show      @relation(fields: [showId], references: [traktId], onDelete: Cascade)
+  episodes  Episode[]
+
+  @@unique([showId, number])
+}
+
+model Episode {
+  id         Int       @id @default(autoincrement())
+  seasonId   Int
+  season     Season    @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  number     Int
+  title      String
+  firstAired DateTime?
+  ids        String    // JSON string to store various IDs if needed
+
+  @@unique([seasonId, number])
+}
+
+model CalendarCache {
+  id        String   @id @default("default")
+  data      String
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id                String   @id @default(uuid())
+  password          String
+  traktAccessToken  String?
+  traktRefreshToken String?
+  traktExpiresAt    String?
+  rpdbKey           String?
+  filters           String?  // JSON string
+  selectedLists     String?  // JSON string: [{id: string, name: string, enabled: boolean, order: number}]
+  manifestVersion   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lists             TraktList[]
+  watchedHistory    WatchedEntry[]
+}
+
+model TraktList {
+  id          String   @id @default(uuid())
+  traktId     String   // "watchlist", "favorites", or numeric ID
+  name        String
+  description String?
+  privacy     String?
+  type        String   // "system" (watchlist), "custom", "personal"
+  count       Int      @default(0)
+  
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  items       TraktListItem[]
+  updatedAt   DateTime @updatedAt
+
+  @@unique([profileId, traktId])
+}
+
+model TraktListItem {
+  id        String   @id @default(uuid())
+  listId    String
+  list      TraktList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  rank      Int
+  listedAt  DateTime
+  type      String   // "show", "movie", "season", "episode"
+  
+  // Content relations
+  showId    Int?
+  show      Show?    @relation(fields: [showId], references: [traktId])
+  
+  movieId   Int?
+  movie     Movie?   @relation(fields: [movieId], references: [traktId])
+  
+  // For Season/Episode
+  seasonNumber  Int?
+  episodeNumber Int?
+
+  @@unique([listId, type, showId, movieId, seasonNumber, episodeNumber])
+  @@index([showId])
+  @@index([movieId])
+}
+
+model WatchedEntry {
+  id            String   @id @default(uuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  
+  type          String   // "show", "movie" (but structure implies episodes for shows)
+  
+  showId        Int?
+  show          Show?    @relation(fields: [showId], references: [traktId])
+  
+  movieId       Int?
+  movie         Movie?   @relation(fields: [movieId], references: [traktId])
+  
+  seasonNumber  Int?
+  episodeNumber Int?
+  
+  lastWatchedAt DateTime
+  plays         Int      @default(1)
+
+  @@unique([profileId, showId, seasonNumber, episodeNumber])
+  @@unique([profileId, movieId]) // For movies, one entry per profile per movie usually sufficient, or we track plays
+  @@index([profileId, showId])
+}
