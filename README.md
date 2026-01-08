@@ -13,7 +13,7 @@
 [![Trakt.tv](https://img.shields.io/badge/Data-Trakt.tv-red)](https://trakt.tv)
 
 <p align="center">
-  <img src="public/logo.png" alt="Most Logo" width="128" height="128" />
+  <img src="public/github_logo.png" alt="Most Logo" width="128" height="128" />
 </p>
 
 In Slavic languages, the word "**most**" literally means "**bridge**" and stands for **Media Organizer for Stremio & Trakt**.
