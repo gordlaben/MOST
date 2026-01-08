@@ -34,6 +34,7 @@ import Image from 'next/image';
 
 interface DashboardProps {
   profileId?: string;
+  enableRegistration?: boolean;
 }
 
 interface SortableListProps extends Omit<HorizontalListProps, 'dragHandle' | 'list'> {
@@ -88,7 +89,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
 
 
 
-export default function Dashboard({ profileId: propProfileId }: DashboardProps) {
+export default function Dashboard({ profileId: propProfileId, enableRegistration = true }: DashboardProps) {
   const {
     calendarUrl,
     stremioUrl,
@@ -447,72 +448,82 @@ export default function Dashboard({ profileId: propProfileId }: DashboardProps) 
           </h1>
           
           <div className="bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-2xl">
-            <p className="text-gray-300 mb-6">
-              Create a profile to start tracking your shows.
-            </p>
-            
-            <form onSubmit={createProfile} className="space-y-4 max-w-sm mx-auto">
-              <div className="space-y-3">
-                <input
-                  type="password"
-                  value={profilePassword}
-                  onChange={(e) => setProfilePassword(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none text-center"
-                  placeholder="Set a Profile Password"
-                  required
-                />
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none text-center"
-                  placeholder="Confirm Password"
-                  required
-                />
-                <div className="text-xs text-left space-y-1 px-2">
-                  {[
-                    { valid: profilePassword.length >= 8, text: "At least 8 characters" },
-                    { valid: /[A-Z]/.test(profilePassword), text: "One uppercase letter" },
-                    { valid: /[0-9]/.test(profilePassword), text: "One number" },
-                    { valid: /[!@#$%^&*(),.?":{}|<>]/.test(profilePassword), text: "One special character" }
-                  ].map((req, i) => (
-                    <div key={i} className={`flex items-center gap-2 transition-colors ${req.valid ? "text-green-400" : "text-gray-500"}`}>
-                      {req.valid ? (
-                        <svg className="shrink-0" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                      ) : (
-                        <svg className="shrink-0 text-red-400" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                      )}
-                      <span>{req.text}</span>
+            {enableRegistration ? (
+              <>
+                <p className="text-gray-300 mb-6">
+                  Create a profile to start tracking your shows.
+                </p>
+                
+                <form onSubmit={createProfile} className="space-y-4 max-w-sm mx-auto">
+                  <div className="space-y-3">
+                    <input
+                      type="password"
+                      value={profilePassword}
+                      onChange={(e) => setProfilePassword(e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none text-center"
+                      placeholder="Set a Profile Password"
+                      required
+                    />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none text-center"
+                      placeholder="Confirm Password"
+                      required
+                    />
+                    <div className="text-xs text-left space-y-1 px-2">
+                      {[
+                        { valid: profilePassword.length >= 8, text: "At least 8 characters" },
+                        { valid: /[A-Z]/.test(profilePassword), text: "One uppercase letter" },
+                        { valid: /[0-9]/.test(profilePassword), text: "One number" },
+                        { valid: /[!@#$%^&*(),.?":{}|<>]/.test(profilePassword), text: "One special character" }
+                      ].map((req, i) => (
+                        <div key={i} className={`flex items-center gap-2 transition-colors ${req.valid ? "text-green-400" : "text-gray-500"}`}>
+                          {req.valid ? (
+                            <svg className="shrink-0" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                          ) : (
+                            <svg className="shrink-0 text-red-400" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                          )}
+                          <span>{req.text}</span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
+                  
+                  {createProfileError && (
+                    <p className="text-red-400 text-sm font-medium">{createProfileError}</p>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={creatingProfile || !isPasswordValid || profilePassword !== confirmPassword}
+                    className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {creatingProfile ? 'Creating Profile...' : 'Create Profile & Start'}
+                  </button>
+                </form>
+
+                <div className="relative my-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-gray-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-sm">
+                    <span className="px-2 bg-gray-800 text-gray-400">OR</span>
+                  </div>
                 </div>
-              </div>
-              
-              {createProfileError && (
-                <p className="text-red-400 text-sm font-medium">{createProfileError}</p>
-              )}
-
-              <button
-                type="submit"
-                disabled={creatingProfile || !isPasswordValid || profilePassword !== confirmPassword}
-                className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creatingProfile ? 'Creating Profile...' : 'Create Profile & Start'}
-              </button>
-            </form>
-
-            <div className="relative my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-700"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-gray-800 text-gray-400">OR</span>
-              </div>
-            </div>
+              </>
+            ) : (
+              <p className="text-gray-300 mb-6">
+                Please log in with your Profile UUID.
+              </p>
+            )}
 
             <form onSubmit={handleLogin} className="space-y-4 max-w-sm mx-auto">
               <div className="space-y-2">
-                <label className="text-sm text-gray-400 font-medium">Already have a profile?</label>
+                {enableRegistration && (
+                  <label className="text-sm text-gray-400 font-medium">Already have a profile?</label>
+                )}
                 <div className="flex gap-2">
                   <input
                     type="text"

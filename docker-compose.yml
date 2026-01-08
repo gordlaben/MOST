@@ -12,6 +12,7 @@ services:
       # Set this to your public URL (e.g. https://most.yourdomain.com) to fix logo/redirect links
       - APP_URL=${APP_URL}
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL:-http://localhost:3000}
+      - ENABLE_REGISTRATION=${ENABLE_REGISTRATION:-true}
     volumes:
       # Map a local data directory to persist the database
       - ./data:/app/data

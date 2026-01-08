@@ -5,6 +5,11 @@ import { getSetting } from '@/lib/settings';
 
 export async function POST(request: Request) {
   try {
+    // Check if registration is enabled
+    if (process.env.ENABLE_REGISTRATION === 'false') {
+      return NextResponse.json({ error: 'Registration is disabled' }, { status: 403 });
+    }
+
     const { password } = await request.json();
 
     if (!password) {

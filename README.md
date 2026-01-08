@@ -98,6 +98,9 @@ services:
 
       # Optional: Secure the /admin dashboard
       - ADMIN_PASSWORD=secure_password
+
+      # Optional: Disable public registration
+      - ENABLE_REGISTRATION=true
     volumes:
       - ./data:/app/data
 ```
@@ -158,6 +161,7 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 | `TRAKT_CLIENT_ID` | Your Trakt.tv Application Client ID. | - |
 | `TRAKT_CLIENT_SECRET` | Your Trakt.tv Application Client Secret. | - |
 | `ADMIN_PASSWORD` | (Optional) Password for accessing the `/admin` dashboard to manage users. | - |
+| `ENABLE_REGISTRATION` | Set to `false` to disable the "Create Profile" form. Useful for private instances. | `true` |
 
 ---
 
