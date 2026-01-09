@@ -215,6 +215,50 @@ export class TraktClient {
         return response.data;
       }
     } catch (error) {
+      // Handle 401 Unauthorized by attempting to refresh token
+      if (axios.isAxiosError(error) && error.response?.status === 401 && this.profileId) {
+        logger.warn(`Received 401 for ${url}. Attempting token refresh for profile ${this.profileId}...`);
+        try {
+          const profile = await prisma.profile.findUnique({ where: { id: this.profileId } });
+          if (profile && profile.traktRefreshToken) {
+             const newTokens = await this.refreshAccessToken(profile.traktRefreshToken);
+             
+             if (newTokens && newTokens.access_token) {
+                 // Update DB
+                 const now = Math.floor(Date.now() / 1000);
+                 const newExpiresAt = (now + newTokens.expires_in).toString();
+                 
+                 await prisma.profile.update({
+                     where: { id: this.profileId },
+                     data: {
+                         traktAccessToken: newTokens.access_token,
+                         traktRefreshToken: newTokens.refresh_token,
+                         traktExpiresAt: newExpiresAt
+                     }
+                 });
+
+                 // Update this instance
+                 this.accessToken = newTokens.access_token;
+                 
+                 // Retry request with new token
+                 // Re-generate headers to include new token
+                 const retryConfig = { ...axiosConfig, headers: this.headers };
+
+                 logger.info(`Token refresh successful, retrying request...`);
+                 if (method === 'get') {
+                    const response = await axios.get(url, retryConfig);
+                    return response.data;
+                  } else {
+                    const response = await axios.post(url, data, retryConfig);
+                    return response.data;
+                  }
+             }
+          }
+        } catch (refreshError) {
+            logger.error(`Token refresh failed during recovery`, refreshError);
+            // Fall through to throw original error
+        }
+      }
       throw error;
     }
   }
