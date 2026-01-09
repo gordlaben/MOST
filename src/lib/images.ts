@@ -14,6 +14,13 @@ if (!fs.existsSync(IMAGES_DIR)) {
 export async function cacheImage(url: string): Promise<string | null> {
   if (!url) return null;
 
+  // Add protocol if missing
+  if (url.startsWith('//')) {
+    url = `https:${url}`;
+  } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = `https://${url}`;
+  }
+
   // Check if we already have a pending download for this URL
   if (pendingDownloads.has(url)) {
       return null; // Let the existing download finish
@@ -86,6 +93,14 @@ export function getCachedImagePath(filename: string): string | null {
 
 export async function getImagePathIfCached(url: string): Promise<string | null> {
     if (!url) return null;
+
+    // Add protocol if missing
+    if (url.startsWith('//')) {
+      url = `https:${url}`;
+    } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `https://${url}`;
+    }
+
     const hash = crypto.createHash('md5').update(url).digest('hex');
     
     for (const ext of ['.jpg', '.png', '.webp', '.jpeg']) {
