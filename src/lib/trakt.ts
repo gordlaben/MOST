@@ -4,6 +4,7 @@ import { prisma } from './db';
 
 const TRAKT_API_URL = 'https://api.trakt.tv';
 const TRAKT_OAUTH_URL = 'https://trakt.tv';
+const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 Hours
 
 interface TraktImage {
     full: string;
@@ -361,7 +362,8 @@ export class TraktClient {
         const cacheKey = `user-lists-${this.profileId}`;
         const cached = await prisma.calendarCache.findUnique({ where: { id: cacheKey } });
         // Cache for 30 minutes
-        if (cached && Date.now() - cached.updatedAt.getTime() < 30 * 60 * 1000) {
+        // Check if we have a valid cache (less than 3 hours old)
+        if (cached && Date.now() - cached.updatedAt.getTime() < CACHE_TTL_MS) {
             try {
                 return JSON.parse(cached.data);
             } catch {
@@ -482,7 +484,7 @@ export class TraktClient {
         
         if (cached) {
             // SWR: Return cached data immediately
-            const isStale = Date.now() - cached.updatedAt.getTime() > 30 * 60 * 1000;
+            const isStale = Date.now() - cached.updatedAt.getTime() > CACHE_TTL_MS;
             
             logger.info(`Cache Hit: ${listId} ${isStale ? '(STALE - Refreshing Background)' : '(FRESH)'}`);
 
@@ -506,7 +508,7 @@ export class TraktClient {
              const cachedPreview = await prisma.calendarCache.findUnique({ where: { id: previewCacheKey } });
              
              if (cachedPreview) {
-                 const isStale = Date.now() - cachedPreview.updatedAt.getTime() > 30 * 60 * 1000;
+                 const isStale = Date.now() - cachedPreview.updatedAt.getTime() > CACHE_TTL_MS;
                  if (isStale) {
                      // Trigger background refresh (preview only)
                      this._fetchListItemsInternal(listId, username, limit).catch(e => logger.error(`Background preview refresh failed for ${listId}`, e));

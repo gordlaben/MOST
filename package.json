@@ -6,7 +6,9 @@
                     "dev":  "next dev",
                     "build":  "next build",
                     "start":  "next start",
-                    "lint":  "eslint"
+                    "lint":  "eslint",
+                    "deploy:dev": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy_dev.ps1",
+                    "deploy:main": "powershell -ExecutionPolicy Bypass -File ./scripts/deploy_main.ps1"
                 },
     "dependencies":  {
                          "@dnd-kit/core":  "^6.3.1",
