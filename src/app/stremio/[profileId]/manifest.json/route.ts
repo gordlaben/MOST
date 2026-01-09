@@ -96,6 +96,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let catalogs: any[] = [];
 
+  const sortExtra = {
+      name: "sort",
+      options: ["newest", "oldest", "title", "title_z_a"],
+      isRequired: false
+  };
+
   if (profile?.selectedLists) {
     try {
       const selectedLists = JSON.parse(profile.selectedLists);
@@ -120,7 +126,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                 catalogs.push({
                     type: "series",
                     id: list.id,
-                    name: list.name
+                    name: list.name,
+                    extra: [sortExtra]
                 });
             } else {
                 // For Trakt lists, we support both series and movies depending on content
@@ -130,7 +137,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                     catalogs.push({
                         type: "series",
                         id: list.id,
-                        name: list.name
+                        name: list.name,
+                        extra: [sortExtra]
                     });
                 }
                 
@@ -138,34 +146,37 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                     catalogs.push({
                         type: "movie",
                         id: list.id,
-                        name: list.name
+                        name: list.name,
+                        extra: [sortExtra]
                     });
                 }
             }
           }
         });
       } else {
-        catalogs = [...defaultSystemLists];
+        catalogs = [...defaultSystemLists.map(l => ({ ...l, extra: [sortExtra] }))];
         selectedLists.forEach((list: SelectedList) => {
           if (list.enabled) {
             catalogs.push({
                 type: "series",
                 id: list.id,
-                name: list.name
+                name: list.name,
+                extra: [sortExtra]
             });
             catalogs.push({
                 type: "movie",
                 id: list.id,
-                name: list.name
+                name: list.name,
+                extra: [sortExtra]
             });
           }
         });
       }
     } catch {
-      catalogs = [...defaultSystemLists];
+      catalogs = [...defaultSystemLists.map(l => ({ ...l, extra: [sortExtra] }))];
     }
   } else {
-    catalogs = [...defaultSystemLists];
+    catalogs = [...defaultSystemLists.map(l => ({ ...l, extra: [sortExtra] }))];
   }
 
   // Add search catalog

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ToastMessage, ToastType } from '@/components/Toast';
 import { TraktBingeReadyShow, TraktEpisodeLeftShow, TraktShow, TraktMovie, TraktSeason, TraktEpisode } from '@/lib/trakt';
@@ -93,10 +93,28 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
   const [includeEnded, setIncludeEnded] = useState(true);
   const [includeCanceled, setIncludeCanceled] = useState(true);
   const [includeReturning, setIncludeReturning] = useState(true);
-  const [sortBy, setSortBy] = useState('newest');
+  const [sortBy, setSortByState] = useState('newest');
+  const [sortPreferences, setSortPreferences] = useState<Record<string, string>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [savingDefaults, setSavingDefaults] = useState(false);
+
+  const currentListId = useMemo(() => {
+    if (view === 'items' && activeList) return activeList.id;
+    if (view === 'home') return activeTab; 
+    return 'global'; 
+  }, [view, activeList, activeTab]);
+
+  // Sync sortBy when active list changes
+  useEffect(() => {
+    const pref = sortPreferences[currentListId] || 'newest';
+    setSortByState(pref);
+  }, [currentListId, sortPreferences]);
+
+  const setSortBy = useCallback((val: string) => {
+    setSortByState(val);
+    setSortPreferences(prev => ({ ...prev, [currentListId]: val }));
+  }, [currentListId]);
 
   // List Management
   const [traktLists, setTraktLists] = useState<TraktList[]>([]);
@@ -376,8 +394,8 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
             setIncludeEnded(data.filters.includeEnded);
             setIncludeCanceled(data.filters.includeCanceled);
             setIncludeReturning(data.filters.includeReturning);
-            if (data.filters.sortBy) {
-                setSortBy(data.filters.sortBy);
+            if (data.filters.sortPreferences) {
+                setSortPreferences(data.filters.sortPreferences);
             }
         }
 
@@ -912,6 +930,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
         FILTER_INCLUDE_CANCELED: includeCanceled.toString(),
         FILTER_INCLUDE_RETURNING: includeReturning.toString(),
         FILTER_SORT_BY: sortBy,
+        listId: currentListId
       };
 
       const res = await fetch('/api/settings', {

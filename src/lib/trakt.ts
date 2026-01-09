@@ -469,7 +469,7 @@ export class TraktClient {
     username?: string, 
     forceRefresh = false, 
     limit?: number, 
-    sortBy?: 'newest' | 'oldest' | 'title',
+    sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a',
     filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean }
   ) {
     logger.debug(`Fetching items for list ${listId} (user: ${username || 'me'})${limit ? ` limit=${limit}` : ''} sortBy=${sortBy} filters=${JSON.stringify(filters)}`);
@@ -742,7 +742,7 @@ export class TraktClient {
 
   // Helper to sort list items
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title') {
+  private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a') {
       if (!Array.isArray(items)) return items;
       if (!sortBy) return items; // Return original order (Rank/Added)
 
@@ -761,6 +761,10 @@ export class TraktClient {
               const titleA = (a.show?.title || a.movie?.title || '').toLowerCase();
               const titleB = (b.show?.title || b.movie?.title || '').toLowerCase();
               return titleA.localeCompare(titleB);
+          } else if (sortBy === 'title_z_a') {
+              const titleA = (a.show?.title || a.movie?.title || '').toLowerCase();
+              const titleB = (b.show?.title || b.movie?.title || '').toLowerCase();
+              return titleB.localeCompare(titleA);
           } else {
               // Newest / Oldest (based on Release Date/First Aired)
               const dateAStr = a.show?.first_aired || a.movie?.released || a.season?.first_aired || a.episode?.first_aired || '1970-01-01';
@@ -1397,7 +1401,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
       forceRefresh?: boolean;
     }
   ): Promise<TraktBingeReadyShow[]> {
@@ -1486,6 +1490,8 @@ export class TraktClient {
     // Apply Sorting
     if (sortBy === 'title') {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
+    } else if (sortBy === 'title_z_a') {
+      results.sort((a, b) => b.show.title.localeCompare(a.show.title));
     } else if (sortBy === 'oldest') {
       results.sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
     } else {
@@ -1502,7 +1508,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
       forceRefresh?: boolean;
     }
   ): Promise<TraktEpisodeLeftShow[]> {
@@ -1613,6 +1619,8 @@ export class TraktClient {
     // Apply Sorting
     if (sortBy === 'title') {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
+    } else if (sortBy === 'title_z_a') {
+      results.sort((a, b) => b.show.title.localeCompare(a.show.title));
     } else if (sortBy === 'oldest') {
       // For episodes left, "oldest" might mean "oldest last watched" or "oldest release date"
       // Let's stick to last watched for now as it's relevant for "continue watching"

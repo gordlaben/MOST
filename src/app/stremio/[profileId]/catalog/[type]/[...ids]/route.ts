@@ -13,7 +13,7 @@ interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
   forceRefresh?: boolean;
 }
 
@@ -237,6 +237,11 @@ export async function GET(
       if (profile.filters) {
         const savedFilters = JSON.parse(profile.filters);
         filters = { ...filters, ...savedFilters };
+        
+        // Override sortBy with per-list preference
+        if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
+             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a';
+        }
       }
       if (profile.rpdbKey) {
         rpdbKey = profile.rpdbKey;
@@ -255,6 +260,17 @@ export async function GET(
     } else {
         // Profile not found
         return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+    }
+  }
+
+  // Handle Sort Param from URL (Overrides profile settings)
+  if (ids.length > 1) {
+    const sortParam = ids.find(p => p.startsWith('sort='));
+    if (sortParam) {
+      const val = sortParam.replace('sort=', '').replace('.json', '');
+      if (val === 'newest' || val === 'oldest' || val === 'title' || val === 'title_z_a') {
+         filters.sortBy = val as 'newest' | 'oldest' | 'title' | 'title_z_a';
+      }
     }
   }
 

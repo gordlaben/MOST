@@ -13,6 +13,7 @@ export async function GET(request: Request) {
   let includeCanceled = (await getSetting('FILTER_INCLUDE_CANCELED')) !== 'false';
   let includeReturning = (await getSetting('FILTER_INCLUDE_RETURNING')) !== 'false';
   let sortBy = (await getSetting('FILTER_SORT_BY')) || 'newest';
+  let sortPreferences: Record<string, string> = {};
   let selectedLists: unknown[] = [];
 
   if (profileId) {
@@ -24,7 +25,8 @@ export async function GET(request: Request) {
         includeEnded = filters.includeEnded;
         includeCanceled = filters.includeCanceled;
         includeReturning = filters.includeReturning;
-        sortBy = filters.sortBy;
+        sortBy = filters.sortBy || 'newest';
+        sortPreferences = filters.sortPreferences || {};
       }
       if (profile.selectedLists) {
         selectedLists = JSON.parse(profile.selectedLists);
@@ -48,7 +50,8 @@ export async function GET(request: Request) {
       includeEnded,
       includeCanceled,
       includeReturning,
-      sortBy
+      sortBy,
+      sortPreferences
     },
     selectedLists
   });
@@ -56,7 +59,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { profileId, rpdbKey, filters, selectedLists, FILTER_INCLUDE_ENDED, FILTER_INCLUDE_CANCELED, FILTER_INCLUDE_RETURNING, FILTER_SORT_BY } = body;
+  const { 
+      profileId, 
+      rpdbKey, 
+      filters, 
+      selectedLists, 
+      FILTER_INCLUDE_ENDED, 
+      FILTER_INCLUDE_CANCELED, 
+      FILTER_INCLUDE_RETURNING, 
+      FILTER_SORT_BY,
+      listId 
+  } = body;
 
   // Note: Trakt Client ID and Secret are no longer saved via API.
   // They must be set via environment variables.
@@ -82,7 +95,18 @@ export async function POST(request: Request) {
     if (FILTER_INCLUDE_ENDED !== undefined) currentFilters.includeEnded = FILTER_INCLUDE_ENDED === 'true';
     if (FILTER_INCLUDE_CANCELED !== undefined) currentFilters.includeCanceled = FILTER_INCLUDE_CANCELED === 'true';
     if (FILTER_INCLUDE_RETURNING !== undefined) currentFilters.includeReturning = FILTER_INCLUDE_RETURNING === 'true';
-    if (FILTER_SORT_BY !== undefined) currentFilters.sortBy = FILTER_SORT_BY;
+    if (FILTER_SORT_BY !== undefined) {
+        if (listId) {
+            // Update specific list sort preference
+            currentFilters.sortPreferences = {
+                ...(currentFilters.sortPreferences || {}),
+                [listId]: FILTER_SORT_BY
+            };
+        } else {
+             // Update global default
+             currentFilters.sortBy = FILTER_SORT_BY;
+        }
+    }
 
     updateData.filters = JSON.stringify(currentFilters);
 
@@ -107,7 +131,8 @@ export async function POST(request: Request) {
     if (FILTER_INCLUDE_ENDED !== undefined) await setSetting('FILTER_INCLUDE_ENDED', String(FILTER_INCLUDE_ENDED));
     if (FILTER_INCLUDE_CANCELED !== undefined) await setSetting('FILTER_INCLUDE_CANCELED', String(FILTER_INCLUDE_CANCELED));
     if (FILTER_INCLUDE_RETURNING !== undefined) await setSetting('FILTER_INCLUDE_RETURNING', String(FILTER_INCLUDE_RETURNING));
-    if (FILTER_SORT_BY !== undefined) await setSetting('FILTER_SORT_BY', FILTER_SORT_BY);
+    
+    if (FILTER_SORT_BY !== undefined && !listId) await setSetting('FILTER_SORT_BY', FILTER_SORT_BY);
   }
 
   return NextResponse.json({ success: true });

@@ -17,6 +17,9 @@ $devTag = "$version-dev"
 
 Write-Host "[INFO] Starting DEV Deployment for version $version..." -ForegroundColor Cyan
 
+# Change directory to project root
+Set-Location (Join-Path $PSScriptRoot "..")
+
 # Docker Build & Push
 Write-Host "[INFO] Building Docker images..." -ForegroundColor Yellow
 docker build -t gordlaben/most:dev -t "gordlaben/most:$devTag" .
