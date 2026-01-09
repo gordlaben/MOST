@@ -1,3 +1,6 @@
+## [0.8.3] - 2026-01-09
+- fix: enable Title (Z-A) sorting, fix deploy_dev script and type definitions - feat: setup deployment scripts and increase Trakt cache TTL to 3h - chore: bump version to 0.8.2 [skip ci] - Implement auto-token refresh on 401 errors in TraktClient - Fix image caching error by handling missing protocol in URLs - chore: bump version to 0.8.1 [skip ci] - chore: bump version to 0.8.0 [skip ci] - chore: bump version to 0.7.9 [skip ci] - chore: stop tracking maintainer script - docs: fix README formatting - docs: update readme - docs: rewrite content for a more natural tone - docs: improve project description and add gallery screenshots - feat: add ENABLE_REGISTRATION env var and update docs - feat: redesign sidebar and add community links - docs: reorder features list and fix formatting - docs: update README.md - chore: upload logo and screenshots assets - docs: use github specific logo in README - docs: finalize readme with screenshots, badges, and disclaimer - Docs: Update README with improved description and config options - chore: bump version to 0.7.8 [skip ci]
+
 # Changelog
 
 ## [0.2.0] - 2026-01-01
@@ -23,3 +26,4 @@
 
 ### Changed
 - **Minimum Refresh Interval**: Increased the absolute minimum refresh interval to 15 minutes to ensure stability.
+
