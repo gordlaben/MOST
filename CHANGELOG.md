@@ -1,3 +1,6 @@
+## [0.8.5] - 2026-01-12
+- Merge branch 'dev' Fix: Explicitly split Watchlist into Series/Movies in Dashboard and Stremio, support per-list sorting on homepage - Fix: Explicitly split Watchlist into Series/Movies in Dashboard and Stremio, support per-list sorting on homepage
+
 ## [0.8.4] - 2026-01-12
 - Merge branch 'dev' fix: Apply sort and filters to Stremio catalog refresh to match Web UI - fix: Apply sort and filters to Stremio catalog refresh to match Web UI - fix: Stremio search and 404 error handling for most_search catalog
 
@@ -29,5 +32,6 @@
 
 ### Changed
 - **Minimum Refresh Interval**: Increased the absolute minimum refresh interval to 15 minutes to ensure stability.
+
 
 
