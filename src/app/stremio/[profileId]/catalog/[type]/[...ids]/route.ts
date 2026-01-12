@@ -68,7 +68,18 @@ async function refreshCatalog(catalogId: string, cacheKey: string, filters: Cata
       items = await trakt.getEpisodesLeftShows(() => {}, filters);
     } else {
       // Personal List
-      const listItems = await trakt.getListItems(catalogId, username);
+      const listItems = await trakt.getListItems(
+          catalogId, 
+          username, 
+          false, 
+          undefined, 
+          filters.sortBy, 
+          {
+             includeEnded: filters.includeEnded ?? true,
+             includeCanceled: filters.includeCanceled ?? true,
+             includeReturning: filters.includeReturning ?? true
+          }
+      );
       
       if (Array.isArray(listItems)) {
         // Map Trakt items to our format
