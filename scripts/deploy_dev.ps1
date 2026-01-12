@@ -13,15 +13,19 @@ $packageJsonPath = Join-Path $PSScriptRoot "..\package.json"
 $content = Get-Content $packageJsonPath -Raw
 $json = $content | ConvertFrom-Json
 $version = $json.version
-$devTag = "$version-dev"
 
-Write-Host "[INFO] Starting DEV Deployment for version $version..." -ForegroundColor Cyan
+# Get Git Hash for unique dev builds
+$gitHash = git rev-parse --short HEAD
+$devTag = "dev-$gitHash"
+
+Write-Host "[INFO] Starting DEV Deployment for version $devTag..." -ForegroundColor Cyan
 
 # Change directory to project root
 Set-Location (Join-Path $PSScriptRoot "..")
 
 # Docker Build & Push
 Write-Host "[INFO] Building Docker images..." -ForegroundColor Yellow
+# Tag as 'dev' (latest dev) AND specific version (traceability)
 docker build -t gordlaben/most:dev -t "gordlaben/most:$devTag" .
 
 Write-Host "[INFO] Pushing Docker images..." -ForegroundColor Yellow
