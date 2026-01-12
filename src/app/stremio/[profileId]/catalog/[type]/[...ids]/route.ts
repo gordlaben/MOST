@@ -161,7 +161,7 @@ export async function GET(
   }
 
   // Handle Search
-  if (ids[0] === 'bingarr_search') {
+  if (ids[0] === 'most_search' || ids[0] === 'most_search.json') {
       const searchParam = ids.find(p => p.startsWith('search='));
       if (!searchParam) {
           return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });

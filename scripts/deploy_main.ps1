@@ -10,6 +10,9 @@ function Get-UserChoice {
     return $input
 }
 
+# Ensure we are in the project root
+Set-Location (Join-Path $PSScriptRoot "..")
+
 # 1. Check Branch
 $branch = git rev-parse --abbrev-ref HEAD
 if ($branch -ne "main") {
@@ -23,7 +26,7 @@ $content = Get-Content $packageJsonPath -Raw
 $json = $content | ConvertFrom-Json
 $currentVersion = $json.version
 
-Write-Host "🚀 Starting MAIN (Production) Deployment" -ForegroundColor Cyan
+Write-Host "[INFO] Starting MAIN (Production) Deployment" -ForegroundColor Cyan
 Write-Host "Current Version: $currentVersion"
 
 # 3. Determine Bump Type
@@ -43,14 +46,19 @@ switch ($bumpType) {
 }
 
 $newVersion = "$major.$minor.$patch"
-Write-Host "⚠️  Bumping version to: $newVersion" -ForegroundColor Yellow
+Write-Host "[WARN] Bumping version to: $newVersion" -ForegroundColor Yellow
 
 # 4. Generate Changelog
 $changelogPath = Join-Path $PSScriptRoot "..\CHANGELOG.md"
 if (-not (Test-Path $changelogPath)) { New-Item $changelogPath -ItemType File }
 
-$lastTag = git describe --tags --abbrev=0 2>$null
-if (-not $lastTag) { $lastTag = git rev-list --max-parents=0 HEAD }
+# Safely get last tag, or fallback to first commit
+try {
+    $lastTag = git describe --tags --abbrev=0 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "No tags found" }
+} catch {
+    $lastTag = git rev-list --max-parents=0 HEAD
+}
 
 $commits = git log "$lastTag..HEAD" --pretty=format:"- %s"
 $date = Get-Date -Format "yyyy-MM-dd"
@@ -64,22 +72,22 @@ $newContent = $json | ConvertTo-Json -Depth 10
 [System.IO.File]::WriteAllText($packageJsonPath, $newContent)
 
 # 6. Build & Push Docker (Before commit to fail early if build fails)
-Write-Host "📦 Building Docker images..." -ForegroundColor Yellow
+Write-Host "[INFO] Building Docker images..." -ForegroundColor Yellow
 docker build -t gordlaben/most:latest -t "gordlaben/most:$newVersion" .
 
-Write-Host "⬆️ Pushing Docker images..." -ForegroundColor Yellow
+Write-Host "[INFO] Pushing Docker images..." -ForegroundColor Yellow
 docker push gordlaben/most:latest
 docker push "gordlaben/most:$newVersion"
 
 # 7. Git Commit & Tag
-Write-Host "💾 Committing and Tagging..." -ForegroundColor Yellow
+Write-Host "[INFO] Committing and Tagging..." -ForegroundColor Yellow
 git add package.json CHANGELOG.md
 git commit -m "chore: release v$newVersion"
 git tag "v$newVersion"
 git push origin main
 git push origin "v$newVersion"
 
-Write-Host "✅ MAIN Deployment Complete!" -ForegroundColor Green
+Write-Host "[SUCCESS] MAIN Deployment Complete!" -ForegroundColor Green
 Write-Host "   - Version bumped to $newVersion"
 Write-Host "   - Changelog updated"
 Write-Host "   - Docker tag: gordlaben/most:latest"
