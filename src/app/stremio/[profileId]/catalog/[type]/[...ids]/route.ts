@@ -68,7 +68,18 @@ async function refreshCatalog(catalogId: string, cacheKey: string, filters: Cata
       items = await trakt.getEpisodesLeftShows(() => {}, filters);
     } else {
       // Personal List
-      const listItems = await trakt.getListItems(catalogId, username);
+      const listItems = await trakt.getListItems(
+          catalogId, 
+          username, 
+          false, 
+          undefined, 
+          filters.sortBy, 
+          {
+             includeEnded: filters.includeEnded ?? true,
+             includeCanceled: filters.includeCanceled ?? true,
+             includeReturning: filters.includeReturning ?? true
+          }
+      );
       
       if (Array.isArray(listItems)) {
         // Map Trakt items to our format
@@ -161,7 +172,7 @@ export async function GET(
   }
 
   // Handle Search
-  if (ids[0] === 'bingarr_search') {
+  if (ids[0] === 'most_search' || ids[0] === 'most_search.json') {
       const searchParam = ids.find(p => p.startsWith('search='));
       if (!searchParam) {
           return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
