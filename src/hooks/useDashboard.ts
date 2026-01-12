@@ -563,7 +563,13 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
       if (exists) {
         newLists = prev.filter(l => l.id !== list.ids.trakt.toString());
       } else {
-        newLists = [...prev, { id: list.ids.trakt.toString(), name: list.name, type: 'trakt', enabled: true }];
+        newLists = [...prev, { 
+            id: list.ids.trakt.toString(), 
+            name: list.name, 
+            type: 'trakt', 
+            enabled: true,
+            content_type: list.content_type
+        }];
       }
       saveLists(newLists);
       return newLists;
@@ -586,7 +592,8 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
                 id: list.ids.trakt.toString(),
                 name: list.name,
                 type: 'trakt' as const,
-                enabled: true
+                enabled: true,
+                content_type: list.content_type
             }));
         newLists = [...selectedLists, ...listsToAdd];
     }
@@ -839,6 +846,23 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
           if (profileId) {
             localStorage.setItem(`most_last_refresh_${profileId}`, now.toString());
           }
+          
+          // Re-fetch lists to get any type updates (e.g. from single type to mixed)
+          // We do this silently after shows are refreshed
+          fetch(`/api/settings?profileId=${profileId}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data.selectedLists && data.selectedLists.length > 0) {
+                      const hasSystemLists = data.selectedLists.some((l: DashboardList) => l.type === 'system');
+                      if (!hasSystemLists) {
+                        setSelectedLists([...SYSTEM_LISTS, ...data.selectedLists]);
+                      } else {
+                        setSelectedLists(data.selectedLists);
+                      }
+                  }
+              })
+              .catch(e => console.error('Failed to reload list config after refresh', e));
+
         }
       })
       .catch((err) => {
@@ -1167,6 +1191,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     removeList,
     renameList,
     updateList,
-    createList
+    createList,
+    sortPreferences
   };
 }

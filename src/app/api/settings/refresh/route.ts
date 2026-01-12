@@ -1,6 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { refreshCatalog, CatalogFilters } from '@/lib/catalog';
+import { refreshCatalog, detectAndUpdateListTypes, CatalogFilters } from '@/lib/catalog';
 import { getProfile } from '@/lib/settings';
 
 interface SelectedList {
@@ -20,6 +20,19 @@ export async function POST(request: Request) {
     const profile = await getProfile(profileId);
     if (!profile) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // 1. Update List Types (Force Check)
+    // This ensures that if a movie list became mixed (user added a show), we detect it now.
+    if (profile.selectedLists) {
+         try {
+             // We can run this in background or await it. 
+             // Since it's a manual "Refresh" action, waiting is safer so the UI updates correctly afterwards.
+             // We use JSON.parse so we pass an array of objects.
+             await detectAndUpdateListTypes(profileId, JSON.parse(profile.selectedLists), true);
+         } catch (e) {
+             console.error('Failed to update list types during refresh', e);
+         }
     }
 
     let filters: CatalogFilters = {

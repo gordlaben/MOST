@@ -29,6 +29,7 @@ export interface HorizontalListProps {
       includeCanceled: boolean;
       includeReturning: boolean;
   };
+  type?: 'movie' | 'show';
 }
 
 export default function HorizontalList({
@@ -46,7 +47,8 @@ export default function HorizontalList({
   onItemClick,
   version = 0,
   sortBy,
-  filters
+  filters,
+  type
 }: HorizontalListProps) {
   const [items, setItems] = useState<ListItem[]>(listItems || []);
   const [loading, setLoading] = useState(!listItems);
@@ -270,6 +272,9 @@ export default function HorizontalList({
         }
         if (filters) {
             url += `&includeEnded=${filters.includeEnded}&includeCanceled=${filters.includeCanceled}&includeReturning=${filters.includeReturning}`;
+        }
+        if (type) {
+            url += `&type=${type}`;
         }
         const res = await fetch(url);
         if (res.ok) {
