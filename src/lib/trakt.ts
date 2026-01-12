@@ -403,7 +403,8 @@ export class TraktClient {
         updated_at: new Date().toISOString(),
         item_count: watchlistCount,
         comment_count: 0,
-        likes: 0
+        likes: 0,
+        content_type: 'mixed'
       } as unknown as TraktList;
 
       const result: TraktList[] = [watchlist, ...lists];
@@ -470,7 +471,7 @@ export class TraktClient {
     forceRefresh = false, 
     limit?: number, 
     sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a',
-    filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean }
+    filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean; type?: 'movie' | 'show' }
   ) {
     logger.debug(`Fetching items for list ${listId} (user: ${username || 'me'})${limit ? ` limit=${limit}` : ''} sortBy=${sortBy} filters=${JSON.stringify(filters)}`);
     
@@ -719,10 +720,21 @@ export class TraktClient {
 
   // Helper to filter list items
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private filterListItems(items: any[], filters: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean }) {
+  private filterListItems(items: any[], filters: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean; type?: 'movie' | 'show' }) {
       if (!Array.isArray(items)) return items;
 
       return items.filter(item => {
+          // Type Filter
+          if (filters.type) {
+              const itemType = item.type; // 'movie' or 'show' usually
+              // Or check presence of keys
+              const isMovie = item.movie || item.type === 'movie';
+              const isShow = item.show || item.type === 'show';
+
+              if (filters.type === 'movie' && !isMovie) return false;
+              if (filters.type === 'show' && !isShow) return false;
+          }
+
           // Only filter Shows (Movies don't have these statuses usually, or we treat them as returning/ended?)
           // Actually Trakt Movies have statuses like "released", "in production".
           // But for now, focus on Shows as per user request (Show Status)

@@ -73,6 +73,35 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
     </div>
   );
 
+  const isWatchlist = list.id === 'watchlist';
+  const contentType = isWatchlist ? 'mixed' : (list.content_type || 'mixed');
+  const shouldSplit = contentType === 'mixed' && (list.type !== 'system' || isWatchlist);
+
+  if (shouldSplit) {
+    return (
+        <div ref={setNodeRef} style={style} className="flex flex-col">
+             <HorizontalList 
+                list={{...list, content_type: 'series'}}
+                type="show"
+                dragHandle={DragHandle} 
+                version={listVersions?.[list.id] || 0}
+                sortBy={currentSort}
+                filters={filters}
+                {...props} 
+            />
+            <HorizontalList 
+                list={{...list, content_type: 'movie'}}
+                type="movie"
+                dragHandle={DragHandle}
+                version={listVersions?.[list.id] || 0}
+                sortBy={currentSort}
+                filters={filters}
+                {...props} 
+            />
+        </div>
+    );
+  }
+
   return (
     <div ref={setNodeRef} style={style}>
         <HorizontalList 
@@ -157,7 +186,8 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
     refreshList,
     createList,
 
-    listVersions
+    listVersions,
+    sortPreferences
   } = useDashboard({ profileId: propProfileId });
 
   const activeFilters = useMemo(() => ({
@@ -1019,7 +1049,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                             compactMode={compactMode}
                                             onItemClick={handleItemClick}
                                             listVersions={listVersions}
-                                            currentSort={sortBy}
+                                            currentSort={sortPreferences?.[list.id] || 'newest'}
                                             filters={activeFilters}
                                         />
                                     );

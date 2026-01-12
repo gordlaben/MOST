@@ -4,6 +4,7 @@ import packageJson from '../../../../../package.json';
 import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
 import { logger } from '@/lib/logger';
+import { detectAndUpdateListTypes } from '@/lib/catalog';
 
 interface SelectedList {
     id: string;
@@ -13,57 +14,6 @@ interface SelectedList {
     content_type?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function detectAndUpdateListTypes(profileId: string, lists: any[]) {
-  let updated = false;
-  try {
-    const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
-    
-    if (!accessToken || !clientId || !clientSecret) return;
-
-    const trakt = new TraktClient(clientId, clientSecret, '', accessToken);
-
-    for (const list of lists) {
-        if (list.type !== 'system' && !list.content_type) {
-             try {
-                 const listOwner = list.type === 'custom' ? list.owner : undefined;
-                 
-                 const items = await trakt.getListItems(list.id, listOwner);
-                 
-                 let hasMovies = false;
-                 let hasShows = false;
-
-                 for (const item of items) {
-                    if (item.movie) hasMovies = true;
-                    if (item.show) hasShows = true;
-                    if (hasMovies && hasShows) break;
-                 }
-
-                 let contentType = 'mixed';
-                 if (hasMovies && !hasShows) contentType = 'movie';
-                 if (!hasMovies && hasShows) contentType = 'series';
-                 
-                 list.content_type = contentType;
-                 updated = true;
-                 logger.info(`Detected type ${contentType} for list ${list.name} (${list.id})`);
-
-             } catch (e) {
-                 logger.error(`Failed to detect type for list ${list.id}`, e);
-             }
-        }
-    }
-
-    if (updated) {
-        await prisma.profile.update({
-            where: { id: profileId },
-            data: { selectedLists: JSON.stringify(lists) }
-        });
-        logger.info(`Updated profile ${profileId} with detected list types`);
-    }
-  } catch (e) {
-    logger.error('Error in detectAndUpdateListTypes', e);
-  }
-}
 
 export async function GET(request: Request, { params }: { params: Promise<{ profileId: string }> }) {
   // We need to await params to satisfy Next.js 15+ dynamic route requirements
@@ -112,6 +62,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
       
       if (needsUpdate) {
           // Trigger background update
+          // @ts-ignore
           detectAndUpdateListTypes(profileId, JSON.parse(profile.selectedLists)).catch(e => logger.error('Background list type detection failed', e));
       }
 
@@ -131,13 +82,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                 });
             } else {
                 // For Trakt lists, we support both series and movies depending on content
-                const contentType = list.content_type || 'mixed';
+                const isWatchlist = list.id === 'watchlist';
+                const contentType = isWatchlist ? 'mixed' : (list.content_type || 'mixed');
+                const shouldSplit = contentType === 'mixed';
                 
                 if (contentType === 'series' || contentType === 'mixed') {
                     catalogs.push({
                         type: "series",
                         id: list.id,
-                        name: list.name,
+                        name: shouldSplit ? `${list.name} (Series)` : list.name,
                         extra: [sortExtra]
                     });
                 }
@@ -146,7 +99,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                     catalogs.push({
                         type: "movie",
                         id: list.id,
-                        name: list.name,
+                        name: shouldSplit ? `${list.name} (Movies)` : list.name,
                         extra: [sortExtra]
                     });
                 }
@@ -157,18 +110,27 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
         catalogs = [...defaultSystemLists.map(l => ({ ...l, extra: [sortExtra] }))];
         selectedLists.forEach((list: SelectedList) => {
           if (list.enabled) {
-            catalogs.push({
-                type: "series",
-                id: list.id,
-                name: list.name,
-                extra: [sortExtra]
-            });
-            catalogs.push({
-                type: "movie",
-                id: list.id,
-                name: list.name,
-                extra: [sortExtra]
-            });
+            const isWatchlist = list.id === 'watchlist';
+            const contentType = isWatchlist ? 'mixed' : (list.content_type || 'mixed');
+            const shouldSplit = contentType === 'mixed';
+            
+            if (contentType === 'series' || contentType === 'mixed') {
+                catalogs.push({
+                    type: "series",
+                    id: list.id,
+                    name: shouldSplit ? `${list.name} (Series)` : list.name,
+                    extra: [sortExtra]
+                });
+            }
+
+            if (contentType === 'movie' || contentType === 'mixed') {
+                catalogs.push({
+                    type: "movie",
+                    id: list.id,
+                    name: shouldSplit ? `${list.name} (Movies)` : list.name,
+                    extra: [sortExtra]
+                });
+            }
           }
         });
       }

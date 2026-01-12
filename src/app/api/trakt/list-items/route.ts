@@ -12,11 +12,12 @@ export async function GET(request: Request) {
   const limitParam = searchParams.get('limit');
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
   const sortBy = (searchParams.get('sortBy') as 'newest' | 'oldest' | 'title') || undefined;
+  const type = (searchParams.get('type') as 'movie' | 'show') || undefined;
   
   const includeEnded = searchParams.get('includeEnded') !== 'false';
   const includeCanceled = searchParams.get('includeCanceled') !== 'false';
   const includeReturning = searchParams.get('includeReturning') !== 'false';
-  const filters = { includeEnded, includeCanceled, includeReturning };
+  const filters = { includeEnded, includeCanceled, includeReturning, type };
 
   if (!profileId || !listId) {
     return NextResponse.json({ error: 'Missing profileId or listId' }, { status: 400 });
