@@ -62,7 +62,11 @@ export async function GET(request: NextRequest) {
         try {
           const shows = await trakt.getBingeReadyShows((message, current, total) => {
              const progress = { type: 'progress', message, current, total };
-             controller.enqueue(encoder.encode(JSON.stringify(progress) + '\n'));
+             try {
+                controller.enqueue(encoder.encode(JSON.stringify(progress) + '\n'));
+             } catch (e) {
+                // Controller closed (client hung up), ignore
+             }
           }, { ...filters, forceRefresh });
           
           // Calculate API Stats

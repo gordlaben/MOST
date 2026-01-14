@@ -163,6 +163,9 @@ export async function GET(
   { params }: { params: Promise<{ profileId: string; type: string; ids: string[] }> }
 ) {
   const { profileId, type, ids } = await params;
+  
+  logger.info(`Stremio Catalog Request (Extended): ${ids.join('/')} (${type}) | Profile: ${profileId}`);
+
   const origin = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
   
   if (type !== 'series' && type !== 'movie') {

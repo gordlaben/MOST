@@ -24,6 +24,8 @@ export async function GET(
   const { profileId, type, id } = await params;
   const catalogId = id.replace('.json', '');
 
+  logger.info(`Stremio Catalog Request: ${catalogId} (${type}) | Profile: ${profileId}`);
+
   if (type !== 'series' && type !== 'movie') {
     return NextResponse.json({ metas: [] }, {
       headers: { 'Access-Control-Allow-Origin': '*' }

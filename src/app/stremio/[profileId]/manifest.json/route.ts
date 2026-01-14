@@ -19,6 +19,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
   // We need to await params to satisfy Next.js 15+ dynamic route requirements
   const { profileId } = await params;
 
+  logger.info(`Stremio Manifest Request | Profile: ${profileId}`);
+
   const profile = await prisma.profile.findUnique({
     where: { id: profileId }
   });
