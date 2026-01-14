@@ -38,6 +38,21 @@ Write-Host "Pulling latest dev..." -ForegroundColor Yellow
 git pull origin dev
 Check-Command
 
+# --- AUTO VERSION BUMP ---
+Write-Host "Auto-incrementing version (Patch)..." -ForegroundColor Cyan
+npm version patch --no-git-tag-version
+Check-Command
+
+$packageJson = Get-Content "package.json" | ConvertFrom-Json
+$newVersion = $packageJson.version
+
+# Stage and commit the version bump on dev
+git add package.json package-lock.json
+# Suppress error if package-lock.json hasn't changed or doesn't exist in git yet
+git commit -m "chore: bump version to $newVersion"
+Check-Command
+# -------------------------
+
 Write-Host "Syncing main branch..." -ForegroundColor Yellow
 git checkout main
 Check-Command

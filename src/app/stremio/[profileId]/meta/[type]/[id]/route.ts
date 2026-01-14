@@ -22,6 +22,8 @@ export async function GET(
 ) {
   const { profileId, type, id } = await params;
   
+  logger.info(`Stremio Meta Request: ${id} (${type}) | Profile: ${profileId}`);
+
   if (type !== 'series' && type !== 'movie') {
     return NextResponse.json({ meta: null }, {
       headers: { 'Access-Control-Allow-Origin': '*' }
