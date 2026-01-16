@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { getSetting } from '@/lib/settings';
+import { z } from 'zod';
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Registration is disabled' }, { status: 403 });
     }
 
-    const { password } = await request.json();
+    const body = await request.json();
+    const bodySchema = z.object({
+      password: z.string().min(1)
+    });
+
+    const parsedBody = bodySchema.safeParse(body);
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const { password } = parsedBody.data;
 
     if (!password) {
       return NextResponse.json({ error: 'Password is required' }, { status: 400 });

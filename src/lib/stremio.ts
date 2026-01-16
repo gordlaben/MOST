@@ -32,6 +32,7 @@ export function mapTraktItemToMeta(
 ): StremioMeta {
   const content = item.show || item.movie || item;
   let poster = null;
+  let originalPoster: string | null = null;
 
   // 1. Try to get poster from Trakt response
   if (content.images?.poster) {
@@ -47,6 +48,7 @@ export function mapTraktItemToMeta(
   if (poster && !poster.startsWith('http')) {
     poster = `https://${poster}`;
   }
+  originalPoster = poster;
 
   // 2. Override with RPDB if available
   if (rpdbKey && rpdbKey !== 'disabled' && content.ids) {
@@ -61,7 +63,10 @@ export function mapTraktItemToMeta(
 
   // 3. Use local proxy for caching (if enabled)
   if (poster && useLocalCache) {
-    poster = `${origin}/api/image?url=${encodeURIComponent(poster)}`;
+    const fallbackParam = originalPoster && poster.includes('ratingposterdb.com')
+      ? `&fallback=${encodeURIComponent(originalPoster)}`
+      : '';
+    poster = `${origin}/api/image?url=${encodeURIComponent(poster)}${fallbackParam}`;
   }
 
   // 4. Generate Description

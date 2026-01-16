@@ -122,6 +122,7 @@ export default function FilterBar({
             <option value="oldest">Oldest Release Date</option>
             <option value="title">Title (A-Z)</option>
             <option value="title_z_a">Title (Z-A)</option>
+            <option value="random">Random</option>
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>

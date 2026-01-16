@@ -3,14 +3,35 @@ import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
 import { cacheImage } from '@/lib/images';
 import { logger } from '@/lib/logger';
+import { createRequestContext } from '@/lib/request-logging';
+import { z } from 'zod';
+import { createServerTiming } from '@/lib/server-timing';
 
 export async function POST(request: Request) {
+  const ctx = createRequestContext(request, 'api/trakt/import-list');
+  const timing = createServerTiming();
   try {
     const body = await request.json();
-    const { profileId, url } = body;
+    const bodySchema = z.object({
+      profileId: z.string().min(1),
+      url: z.string().url()
+    });
+
+    const parsedBody = bodySchema.safeParse(body);
+    if (!parsedBody.success) {
+      const response = NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      timing.appendTo(response, 'trakt_import_list');
+      ctx.end(response.status);
+      return response;
+    }
+
+    const { profileId, url } = parsedBody.data;
 
     if (!profileId || !url) {
-      return NextResponse.json({ error: 'Missing profileId or url' }, { status: 400 });
+      const response = NextResponse.json({ error: 'Missing profileId or url' }, { status: 400 });
+      timing.appendTo(response, 'trakt_import_list');
+      ctx.end(response.status);
+      return response;
     }
 
     // Parse URL
@@ -19,7 +40,10 @@ export async function POST(request: Request) {
     const match = url.match(regex);
 
     if (!match) {
-      return NextResponse.json({ error: 'Invalid Trakt list URL' }, { status: 400 });
+      const response = NextResponse.json({ error: 'Invalid Trakt list URL' }, { status: 400 });
+      timing.appendTo(response, 'trakt_import_list');
+      ctx.end(response.status);
+      return response;
     }
 
     const username = match[1];
@@ -29,7 +53,10 @@ export async function POST(request: Request) {
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
 
     if (!clientId || !clientSecret || !accessToken) {
-      return NextResponse.json({ error: 'Missing Trakt credentials' }, { status: 401 });
+      const response = NextResponse.json({ error: 'Missing Trakt credentials' }, { status: 401 });
+      timing.appendTo(response, 'trakt_import_list');
+      ctx.end(response.status);
+      return response;
     }
 
     const trakt = new TraktClient(clientId, clientSecret, '', accessToken);
@@ -39,8 +66,11 @@ export async function POST(request: Request) {
     const items = await trakt.getListItems(listId, username);
 
     if (!Array.isArray(items)) {
-      logger.error(`getListItems returned non-array for ${listId}`, items);
-      return NextResponse.json({ error: 'Failed to retrieve list items from Trakt. The list might be empty or inaccessible.' }, { status: 500 });
+      ctx.log.error(`getListItems returned non-array for ${listId}`, items);
+      const response = NextResponse.json({ error: 'Failed to retrieve list items from Trakt. The list might be empty or inaccessible.' }, { status: 500 });
+      timing.appendTo(response, 'trakt_import_list');
+      ctx.end(response.status);
+      return response;
     }
 
     let hasMovies = false;
@@ -85,14 +115,20 @@ export async function POST(request: Request) {
       }
     })();
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       ...listDetails,
       username, // Return username so we can store it
       content_type: contentType
     });
+    timing.appendTo(response, 'trakt_import_list');
+    ctx.end(response.status);
+    return response;
 
   } catch (error) {
     console.error('Error importing list:', error);
-    return NextResponse.json({ error: 'Failed to import list' }, { status: 500 });
+    const response = NextResponse.json({ error: 'Failed to import list' }, { status: 500 });
+    timing.appendTo(response, 'trakt_import_list');
+    ctx.end(response.status);
+    return response;
   }
 }

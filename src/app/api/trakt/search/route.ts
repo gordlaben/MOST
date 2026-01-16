@@ -1,26 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTraktCredentials } from '@/lib/settings';
 import { TraktClient } from '@/lib/trakt';
-import { logger } from '@/lib/logger';
+import { createRequestContext } from '@/lib/request-logging';
+import { z } from 'zod';
+import { createServerTiming } from '@/lib/server-timing';
 
 export async function GET(request: NextRequest) {
+  const ctx = createRequestContext(request, 'api/trakt/search');
+  const timing = createServerTiming();
   const searchParams = request.nextUrl.searchParams;
   const profileId = searchParams.get('profileId');
   const query = searchParams.get('query');
 
+  const querySchema = z.object({
+    profileId: z.string().min(1),
+    query: z.string().optional()
+  });
+
+  const parsed = querySchema.safeParse({ profileId, query });
+  if (!parsed.success) {
+    const response = NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    timing.appendTo(response, 'trakt_search');
+    ctx.end(response.status);
+    return response;
+  }
+
   if (!profileId) {
-    return NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
+    const response = NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
+    ctx.end(response.status);
+    return response;
   }
 
   if (!query) {
-      return NextResponse.json({ results: [] });
+      const response = NextResponse.json({ results: [] });
+      ctx.end(response.status);
+      return response;
   }
 
   try {
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
 
     if (!accessToken) {
-      return NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
+      const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
+      timing.appendTo(response, 'trakt_search');
+      ctx.end(response.status);
+      return response;
     }
 
     const trakt = new TraktClient(
@@ -45,9 +69,15 @@ export async function GET(request: NextRequest) {
     // We'll combine them. 
     const results = [...(movieResults || []), ...(showResults || [])];
 
-    return NextResponse.json({ results });
+    const response = NextResponse.json({ results });
+    timing.appendTo(response, 'trakt_search');
+    ctx.end(response.status);
+    return response;
   } catch (error) {
-    logger.error('Failed to search trakt', error);
-    return NextResponse.json({ error: 'Failed to search' }, { status: 500 });
+    ctx.log.error('Failed to search trakt', error);
+    const response = NextResponse.json({ error: 'Failed to search' }, { status: 500 });
+    timing.appendTo(response, 'trakt_search');
+    ctx.end(response.status);
+    return response;
   }
 }

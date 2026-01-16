@@ -13,7 +13,7 @@ interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
   forceRefresh?: boolean;
 }
 
@@ -253,8 +253,8 @@ export async function GET(
         filters = { ...filters, ...savedFilters };
         
         // Override sortBy with per-list preference
-        if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
-             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a';
+           if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
+             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
         }
       }
       if (profile.rpdbKey) {
@@ -282,8 +282,8 @@ export async function GET(
     const sortParam = ids.find(p => p.startsWith('sort='));
     if (sortParam) {
       const val = sortParam.replace('sort=', '').replace('.json', '');
-      if (val === 'newest' || val === 'oldest' || val === 'title' || val === 'title_z_a') {
-         filters.sortBy = val as 'newest' | 'oldest' | 'title' | 'title_z_a';
+      if (val === 'newest' || val === 'oldest' || val === 'title' || val === 'title_z_a' || val === 'random') {
+        filters.sortBy = val as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
       }
     }
   }

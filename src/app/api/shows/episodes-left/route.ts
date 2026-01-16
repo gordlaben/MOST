@@ -4,8 +4,11 @@ import { prisma } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 import { cacheImage } from '@/lib/images';
 import { logger } from '@/lib/logger';
+import { createRequestContext } from '@/lib/request-logging';
+import { getAppConfig } from '@/lib/config';
 
 export async function GET(request: NextRequest) {
+  const ctx = createRequestContext(request, 'api/shows/episodes-left');
   const searchParams = request.nextUrl.searchParams;
   const forceRefresh = searchParams.get('force') === 'true';
 
@@ -31,9 +34,11 @@ export async function GET(request: NextRequest) {
       if (cacheAge < 24 * 60 * 60 * 1000) {
         try {
           const data = JSON.parse(cached.data);
-          return NextResponse.json(data, {
+          const response = NextResponse.json(data, {
             headers: { 'X-Cache': 'HIT' }
           });
+          ctx.end(response.status);
+          return response;
         } catch {
           // If JSON parse fails, ignore cache
         }
@@ -44,13 +49,17 @@ export async function GET(request: NextRequest) {
   const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
 
   if (!accessToken) {
-    return NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
+    const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
+    ctx.end(response.status);
+    return response;
   }
 
+  const { traktClientId, traktClientSecret, nextPublicBaseUrl } = getAppConfig();
+
   const trakt = new TraktClient(
-    clientId || process.env.TRAKT_CLIENT_ID || '',
-    clientSecret || process.env.TRAKT_CLIENT_SECRET || '',
-    process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+    clientId || traktClientId || '',
+    clientSecret || traktClientSecret || '',
+    nextPublicBaseUrl,
     accessToken,
     profileId
   );
@@ -129,14 +138,18 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    return new Response(stream, {
+    const response = new Response(stream, {
       headers: { 
         'Content-Type': 'application/x-ndjson',
         'X-Cache': 'MISS'
       }
     });
+    ctx.end(response.status);
+    return response;
   } catch (error) {
     console.error('Failed to fetch episodes left shows:', error);
-    return NextResponse.json({ error: 'Failed to fetch shows' }, { status: 500 });
+    const response = NextResponse.json({ error: 'Failed to fetch shows' }, { status: 500 });
+    ctx.end(response.status);
+    return response;
   }
 }
