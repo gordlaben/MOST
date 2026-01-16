@@ -45,7 +45,12 @@ export async function cacheImage(url: string): Promise<string | null> {
     }
 
     // File does not exist, proceed to download
-    const response = await fetch(url);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+      }
+    });
     if (!response.ok) {
       logger.warn(`Failed to fetch image: ${url} (${response.status})`);
       return null;

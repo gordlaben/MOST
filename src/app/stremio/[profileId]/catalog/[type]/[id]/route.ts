@@ -23,6 +23,7 @@ export async function GET(
 ) {
   const { profileId, type, id } = await params;
   const catalogId = id.replace('.json', '');
+  const sortParam = request.nextUrl.searchParams.get('sort');
 
   logger.info(`Stremio Catalog Request: ${catalogId} (${type}) | Profile: ${profileId}`);
 
@@ -57,6 +58,11 @@ export async function GET(
       if (profile.filters) {
         const savedFilters = JSON.parse(profile.filters);
         filters = { ...filters, ...savedFilters };
+
+        // Override sortBy with per-list preference
+        if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
+          filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a';
+        }
       }
       if (profile.rpdbKey) {
         rpdbKey = profile.rpdbKey;
@@ -76,6 +82,11 @@ export async function GET(
         // Profile not found
         return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
     }
+  }
+
+  // Handle Sort Param from URL (Overrides profile settings)
+  if (sortParam && (sortParam === 'newest' || sortParam === 'oldest' || sortParam === 'title' || sortParam === 'title_z_a' || sortParam === 'random')) {
+    filters.sortBy = sortParam as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
   }
 
   // Ensure strict key order for cache key consistency with API routes

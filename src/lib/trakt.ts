@@ -1,10 +1,15 @@
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { logger } from './logger';
 import { prisma } from './db';
+import { getBingeReadyStatusFromSeasons } from './binge-ready';
 
 const TRAKT_API_URL = 'https://api.trakt.tv';
 const TRAKT_OAUTH_URL = 'https://trakt.tv';
 const CACHE_TTL_MS = 3 * 60 * 60 * 1000; // 3 Hours
+const DEFAULT_TIMEOUT_MS = 15000; // 15 seconds timeout
+const DEFAULT_RETRY_COUNT = 0; // No retries by default (behavior unchanged)
+const DEFAULT_RETRY_DELAY_MS = 250;
 
 interface TraktImage {
     full: string;
@@ -199,22 +204,73 @@ export class TraktClient {
     return headers;
   }
 
-  private async request<T>(method: 'get' | 'post', url: string, data?: unknown, config?: object): Promise<T> {
-    this.requestCount++;
-    const axiosConfig = {
+  private buildAxiosConfig(config?: object) {
+    return {
       ...config,
       headers: this.headers,
-      timeout: 15000, // 15 seconds timeout
+      timeout: DEFAULT_TIMEOUT_MS,
     };
+  }
+
+  private async delay(ms: number) {
+    if (ms <= 0) return;
+    await new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private shouldRetry(error: unknown, attempt: number, maxAttempts: number) {
+    if (attempt >= maxAttempts) return false;
+
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status;
+
+      // Retry on transient network errors or 5xx/429
+      if (!status) return true;
+      if (status === 429) return true;
+      if (status >= 500 && status < 600) return true;
+    }
+
+    return false;
+  }
+
+  private getRetryDelayMs(attempt: number) {
+    return DEFAULT_RETRY_DELAY_MS * attempt;
+  }
+
+  private async request<T>(method: 'get' | 'post', url: string, data?: unknown, config?: object): Promise<T> {
+    this.requestCount++;
+    const requestId = randomUUID();
+    const startTime = Date.now();
+    const maxAttempts = DEFAULT_RETRY_COUNT + 1;
+    let lastError: unknown;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const axiosConfig = this.buildAxiosConfig(config);
+
+      try {
+        if (method === 'get') {
+          const response = await axios.get(url, axiosConfig);
+          const durationMs = Date.now() - startTime;
+          logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
+          return response.data;
+        } else {
+          const response = await axios.post(url, data, axiosConfig);
+          const durationMs = Date.now() - startTime;
+          logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
+          return response.data;
+        }
+      } catch (error) {
+        lastError = error;
+        if (!this.shouldRetry(error, attempt, maxAttempts)) {
+          const durationMs = Date.now() - startTime;
+          logger.debug('Trakt request failed', { requestId, method, url, durationMs, attempt });
+          throw error;
+        }
+        await this.delay(this.getRetryDelayMs(attempt));
+      }
+    }
 
     try {
-      if (method === 'get') {
-        const response = await axios.get(url, axiosConfig);
-        return response.data;
-      } else {
-        const response = await axios.post(url, data, axiosConfig);
-        return response.data;
-      }
+      throw lastError;
     } catch (error) {
       // Handle 401 Unauthorized by attempting to refresh token
       if (axios.isAxiosError(error) && error.response?.status === 401 && this.profileId) {
@@ -243,7 +299,7 @@ export class TraktClient {
                  
                  // Retry request with new token
                  // Re-generate headers to include new token
-                 const retryConfig = { ...axiosConfig, headers: this.headers };
+                 const retryConfig = this.buildAxiosConfig(config);
 
                  logger.info(`Token refresh successful, retrying request...`);
                  if (method === 'get') {
@@ -470,7 +526,7 @@ export class TraktClient {
     username?: string, 
     forceRefresh = false, 
     limit?: number, 
-    sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a',
+    sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random',
     filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean; type?: 'movie' | 'show' }
   ) {
     logger.debug(`Fetching items for list ${listId} (user: ${username || 'me'})${limit ? ` limit=${limit}` : ''} sortBy=${sortBy} filters=${JSON.stringify(filters)}`);
@@ -754,9 +810,18 @@ export class TraktClient {
 
   // Helper to sort list items
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a') {
+    private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random') {
       if (!Array.isArray(items)) return items;
       if (!sortBy) return items; // Return original order (Rank/Added)
+
+      if (sortBy === 'random') {
+        const shuffled = [...items];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      }
 
       // Log first item to debug sorting
       if (items.length > 0) {
@@ -1365,42 +1430,7 @@ export class TraktClient {
         }
       }
 
-      // Filter out specials (season 0)
-      const regularSeasons = seasons.filter((s) => s.number > 0);
-      
-      if (regularSeasons.length === 0) {
-        return { isReady: false, releaseDate: null, lastEpisode: null, season: null };
-      }
-
-      const lastSeason = regularSeasons[regularSeasons.length - 1];
-      // Episodes are now included in the season object
-      const episodes = lastSeason.episodes || [];
-      
-      if (episodes.length === 0) {
-        return { isReady: false, releaseDate: null, lastEpisode: null, season: lastSeason };
-      }
-
-      const lastEpisode = episodes[episodes.length - 1];
-      
-      if (!lastEpisode.first_aired) {
-        return { isReady: false, releaseDate: null, lastEpisode: null, season: null };
-      }
-
-      const airDate = new Date(lastEpisode.first_aired);
-      
-      // Filter out invalid dates or epoch dates (1970)
-      if (isNaN(airDate.getTime()) || airDate.getFullYear() === 1970) {
-        return { isReady: false, releaseDate: null, lastEpisode: null, season: null };
-      }
-
-      const now = new Date();
-
-      return {
-        isReady: now >= airDate,
-        releaseDate: airDate,
-        lastEpisode: lastEpisode,
-        season: lastSeason
-      };
+      return getBingeReadyStatusFromSeasons(seasons);
     } catch (error) {
       console.error(`Error checking binge status for ${showId}:`, error);
       return { isReady: false, releaseDate: null, lastEpisode: null, season: null };
@@ -1413,7 +1443,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
       forceRefresh?: boolean;
     }
   ): Promise<TraktBingeReadyShow[]> {
@@ -1500,7 +1530,12 @@ export class TraktClient {
     }
     
     // Apply Sorting
-    if (sortBy === 'title') {
+    if (sortBy === 'random') {
+      for (let i = results.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [results[i], results[j]] = [results[j], results[i]];
+      }
+    } else if (sortBy === 'title') {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
     } else if (sortBy === 'title_z_a') {
       results.sort((a, b) => b.show.title.localeCompare(a.show.title));
@@ -1520,7 +1555,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
       forceRefresh?: boolean;
     }
   ): Promise<TraktEpisodeLeftShow[]> {
@@ -1629,7 +1664,12 @@ export class TraktClient {
     }
     
     // Apply Sorting
-    if (sortBy === 'title') {
+    if (sortBy === 'random') {
+      for (let i = results.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [results[i], results[j]] = [results[j], results[i]];
+      }
+    } else if (sortBy === 'title') {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
     } else if (sortBy === 'title_z_a') {
       results.sort((a, b) => b.show.title.localeCompare(a.show.title));

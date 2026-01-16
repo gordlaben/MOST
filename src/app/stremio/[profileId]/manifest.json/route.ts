@@ -5,6 +5,7 @@ import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
 import { logger } from '@/lib/logger';
 import { detectAndUpdateListTypes } from '@/lib/catalog';
+import { getAppConfig } from '@/lib/config';
 
 interface SelectedList {
     id: string;
@@ -30,7 +31,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
   
   const host = request.headers.get('host');
   const proto = request.headers.get('x-forwarded-proto') || 'https';
-  const origin = process.env.APP_URL || (host ? `${proto}://${host}` : new URL(request.url).origin);
+  const { appUrl } = getAppConfig();
+  const origin = appUrl || (host ? `${proto}://${host}` : new URL(request.url).origin);
 
   const defaultSystemLists = [
     {
@@ -50,7 +52,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
 
   const sortExtra = {
       name: "sort",
-      options: ["newest", "oldest", "title", "title_z_a"],
+      options: ["newest", "oldest", "title", "title_z_a", "random"],
       isRequired: false
   };
 
@@ -89,21 +91,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                 const shouldSplit = contentType === 'mixed';
                 
                 if (contentType === 'series' || contentType === 'mixed') {
-                    catalogs.push({
-                        type: "series",
-                        id: list.id,
-                        name: shouldSplit ? `${list.name} (Series)` : list.name,
-                        extra: [sortExtra]
-                    });
+                  catalogs.push({
+                    type: "series",
+                    id: list.id,
+                    name: shouldSplit && !isWatchlist ? `${list.name} (Series)` : list.name,
+                    extra: [sortExtra]
+                  });
                 }
                 
                 if (contentType === 'movie' || contentType === 'mixed') {
-                    catalogs.push({
-                        type: "movie",
-                        id: list.id,
-                        name: shouldSplit ? `${list.name} (Movies)` : list.name,
-                        extra: [sortExtra]
-                    });
+                  catalogs.push({
+                    type: "movie",
+                    id: list.id,
+                    name: shouldSplit && !isWatchlist ? `${list.name} (Movies)` : list.name,
+                    extra: [sortExtra]
+                  });
                 }
             }
           }
@@ -117,21 +119,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
             const shouldSplit = contentType === 'mixed';
             
             if (contentType === 'series' || contentType === 'mixed') {
-                catalogs.push({
-                    type: "series",
-                    id: list.id,
-                    name: shouldSplit ? `${list.name} (Series)` : list.name,
-                    extra: [sortExtra]
-                });
+              catalogs.push({
+                type: "series",
+                id: list.id,
+                name: shouldSplit && !isWatchlist ? `${list.name} (Series)` : list.name,
+                extra: [sortExtra]
+              });
             }
 
             if (contentType === 'movie' || contentType === 'mixed') {
-                catalogs.push({
-                    type: "movie",
-                    id: list.id,
-                    name: shouldSplit ? `${list.name} (Movies)` : list.name,
-                    extra: [sortExtra]
-                });
+              catalogs.push({
+                type: "movie",
+                id: list.id,
+                name: shouldSplit && !isWatchlist ? `${list.name} (Movies)` : list.name,
+                extra: [sortExtra]
+              });
             }
           }
         });

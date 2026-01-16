@@ -80,24 +80,49 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
   if (shouldSplit) {
     return (
         <div ref={setNodeRef} style={style} className="flex flex-col">
-             <HorizontalList 
-                list={{...list, content_type: 'series'}}
-                type="show"
-                dragHandle={DragHandle} 
-                version={listVersions?.[list.id] || 0}
-                sortBy={currentSort}
-                filters={filters}
-                {...props} 
+        {isWatchlist ? (
+          <>
+            <HorizontalList 
+              list={{...list, content_type: 'movie'}}
+              type="movie"
+              dragHandle={DragHandle}
+              version={listVersions?.[list.id] || 0}
+              sortBy={currentSort}
+              filters={filters}
+              {...props} 
             />
             <HorizontalList 
-                list={{...list, content_type: 'movie'}}
-                type="movie"
-                dragHandle={DragHandle}
-                version={listVersions?.[list.id] || 0}
-                sortBy={currentSort}
-                filters={filters}
-                {...props} 
+              list={{...list, content_type: 'series'}}
+              type="show"
+              dragHandle={DragHandle} 
+              version={listVersions?.[list.id] || 0}
+              sortBy={currentSort}
+              filters={filters}
+              {...props} 
             />
+          </>
+        ) : (
+          <>
+            <HorizontalList 
+              list={{...list, content_type: 'series'}}
+              type="show"
+              dragHandle={DragHandle} 
+              version={listVersions?.[list.id] || 0}
+              sortBy={currentSort}
+              filters={filters}
+              {...props} 
+            />
+            <HorizontalList 
+              list={{...list, content_type: 'movie'}}
+              type="movie"
+              dragHandle={DragHandle}
+              version={listVersions?.[list.id] || 0}
+              sortBy={currentSort}
+              filters={filters}
+              {...props} 
+            />
+          </>
+        )}
         </div>
     );
   }
@@ -187,7 +212,9 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
     createList,
 
     listVersions,
-    sortPreferences
+    sortPreferences,
+    hasLoadedBinge,
+    hasLoadedEpisodes
   } = useDashboard({ profileId: propProfileId });
 
   const activeFilters = useMemo(() => ({
@@ -267,6 +294,10 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
       posterUrl?: string | null;
   }>({ isOpen: false });
 
+  const visibleLists = useMemo(() => {
+    return showHiddenLists ? selectedLists : selectedLists.filter(l => l.enabled !== false);
+  }, [showHiddenLists, selectedLists]);
+
   // Scroll Restoration Logic
   const homeScrollY = useRef(0);
   
@@ -286,7 +317,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
 
   useEffect(() => {
     if (loadMoreInView) {
-        setVisibleCount(prev => prev + 24);
+      setVisibleCount(prev => prev + 24);
     }
   }, [loadMoreInView, visibleCount]);
 
@@ -427,14 +458,13 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
 
 
   
-  useEffect(() => {
-    if (!profileId) return;
+  const fanarts = useMemo(() => {
+    if (!profileId) return [] as string[];
 
-    const allShows = [...bingeReadyShows, ...episodesLeftShows];
-    const fanarts = allShows
+    return [...bingeReadyShows, ...episodesLeftShows]
       .map(item => {
         const images = item.show?.images;
-        let url = null;
+        let url: string | null = null;
 
         // Handle different Trakt image formats (array or object)
         if (images?.fanart) {
@@ -446,28 +476,28 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
         }
 
         // Ensure URL has protocol
-        if (url && typeof url === 'string' && !url.startsWith('http')) {
+        if (url && !url.startsWith('http')) {
           return `https://${url}`;
         }
         return url;
       })
-      .filter(Boolean);
+      .filter((url): url is string => Boolean(url));
+  }, [bingeReadyShows, episodesLeftShows, profileId]);
 
-    if (fanarts.length === 0) return;
+  useEffect(() => {
+    if (!profileId || fanarts.length === 0) return;
 
-    // Set initial random image if none set
     if (!bgImage) {
-        setBgImage(fanarts[Math.floor(Math.random() * fanarts.length)]);
+      setBgImage(fanarts[Math.floor(Math.random() * fanarts.length)]);
     }
 
-    // Rotate images every 15 seconds
     const interval = setInterval(() => {
       const randomImage = fanarts[Math.floor(Math.random() * fanarts.length)];
       setBgImage(randomImage);
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [bingeReadyShows, episodesLeftShows, profileId, bgImage]);
+  }, [profileId, fanarts]);
 
   if (!profileId && !isAuthorized) {
     return (
@@ -602,6 +632,18 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
             </h1>
         )}
 
+        {!status?.isConnected && status?.hasCredentials && profileId && (
+          <div className="w-full max-w-2xl mx-auto rounded-xl border border-yellow-500/40 bg-yellow-500/10 text-yellow-200 px-4 py-3 text-sm font-semibold flex items-center justify-between gap-3">
+            <span>Your Trakt session needs re-authentication.</span>
+            <a
+              href={`/api/auth/login?profileId=${profileId}`}
+              className="px-3 py-1.5 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-400/40 text-yellow-100 text-xs font-bold transition-colors"
+            >
+              Re-authenticate
+            </a>
+          </div>
+        )}
+
         <div className={status?.isConnected ? "" : "bg-gray-800 p-4 md:p-8 rounded-xl shadow-2xl border border-gray-700"}>
           <div className="space-y-6">
             <div className="flex flex-col gap-4">
@@ -618,6 +660,14 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                   >
                     {status?.hasCredentials ? 'Connect Trakt Account' : 'Configure API Keys First'}
                   </a>
+                  {status?.hasCredentials && profileId && (
+                    <a
+                      href={`/api/auth/login?profileId=${profileId}`}
+                      className="w-full py-3 px-6 rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2 bg-gray-900/60 hover:bg-gray-900 text-gray-300 hover:text-white border border-gray-700"
+                    >
+                      Re-authorize Trakt
+                    </a>
+                  )}
                   <a 
                     href={profileId ? `/stremio/${profileId}/settings` : "#"} 
                     className="text-sm text-gray-400 hover:text-white underline decoration-gray-600 underline-offset-4 transition-colors"
@@ -911,7 +961,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                 onClick={() => window.location.href = `/api/auth/login?profileId=${profileId}${profileId ? '&force=true' : ''}`}
                                 className="px-3 py-2 rounded-lg text-xs font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors border border-white/5 hover:border-white/10"
                             >
-                                Switch Trakt
+                            Re-authorize Trakt
                             </button>
                             <button 
                                 onClick={handleLogout}
@@ -1022,20 +1072,24 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                         
                         <div className={`transition-opacity duration-300 ${searchQuery.trim().length > 2 ? 'opacity-10 pointer-events-none grayscale' : ''}`}>
                              {(() => {
-                                 const visibleLists = (showHiddenLists ? selectedLists : selectedLists.filter(l => l.enabled !== false));
-
                                  return (
                              <>
                                {visibleLists.slice(0, visibleListsCount).map(list => {
                                     let preloadedItems = null;
                                     if (list.id === 'binge_ready') preloadedItems = bingeReadyShows;
                                     if (list.id === 'episodes_left') preloadedItems = episodesLeftShows;
+                                  const listLoading = list.id === 'binge_ready'
+                                    ? !hasLoadedBinge
+                                    : list.id === 'episodes_left'
+                                    ? !hasLoadedEpisodes
+                                    : undefined;
 
                                     return (
                                         <SortableHorizontalListWrapper 
                                             key={list.id}
                                             list={list}
                                             listItems={preloadedItems ?? undefined}
+                                      listLoading={listLoading}
                                             profileId={profileId || undefined}
                                             rpdbKey={status?.rpdbKey}
                                             onMarkWatched={markAsWatched}
@@ -1349,119 +1403,117 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                     />
 
                     {/* Content Grid */}
-                    {loadingShows ? (
-                        <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                            <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                            <p className="text-gray-400 animate-pulse">{loadingMessage}</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 content-start">
-                            {/* Placeholder Card - Vertical Variation */}
-                            {activeList?.type !== 'system' && (() => {
-                                const currentList = selectedLists.find(l => l.id === activeList?.id);
-                                if (!currentList) return null;
-
-                                return (
-                                <div 
-                                    className={`relative flex flex-col bg-gray-800 rounded-lg overflow-hidden border transition-all cursor-pointer group ${
-                                        currentList.placeholder?.enabled 
-                                            ? 'border-purple-500/50 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-900/20' 
-                                            : 'border-dashed border-gray-700 hover:border-gray-500 bg-gray-800/50'
-                                    }`}
-                                    onClick={() => activeList && openPlaceholderModal(activeList.id)}
-                                >
-                                    {/* Poster Section */}
-                                    <div className="relative w-full aspect-[2/3] bg-gray-900">
-                                        {currentList.placeholder?.enabled ? (
-                                            <>
-                                                <Image
-                                                    src={currentList.placeholder?.poster || '/poster-placeholder.svg'} 
-                                                    alt="Placeholder"
-                                                    fill
-                                                    className="object-cover"
-                                                    unoptimized
-                                                />
-                                                <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm z-10 shadow-lg bg-purple-900/80 text-purple-200">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                                                    Custom
-                                                </div>
-                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                    <div className="bg-gray-900/80 p-2 rounded-full text-white">
-                                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                                    </div>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div className="w-full h-full flex flex-col items-center justify-center text-center gap-2 p-3 text-gray-500 hover:text-gray-300 transition-colors">
-                                                <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mb-1">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-                                                </div>
-                                                <span className="text-xs font-bold">List Placeholder</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Content Section */}
-                                    <div className="p-3 flex flex-col gap-1 flex-1 min-h-[80px]">
-                                        <h3 className="text-sm font-bold text-white leading-tight line-clamp-2 h-9 mb-0.5">
-                                            {currentList.placeholder?.title || activeList?.name}
-                                        </h3>
-                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-400 text-[10px]">
-                                            <span className="text-gray-500 font-semibold">List Cover</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                );
-                            })()
-                            }
-
-                            {(() => {
-                                const allItems: DashboardItem[] = (activeList?.type === 'system' 
-                                    ? (activeList.id === 'binge_ready' ? bingeReadyShows : episodesLeftShows)
-                                    : listItems
-                                );
-                                
-                                const filteredItems = allItems.filter((item) => {
-                                    const content = item.show || ('movie' in item ? item.movie : undefined);
-                                    return content && (!searchQuery || content.title.toLowerCase().includes(searchQuery.toLowerCase()));
-                                });
-
-                                return (
-                                    <>
-                                        {filteredItems.slice(0, visibleCount).map((item) => {
-                                            const content = item.show || ('movie' in item ? item.movie : undefined);
-                                            if (!content) return null;
-                                            
-                                            return (
-                                            <ShowCard
-                                                key={content.ids.trakt}
-                                                item={item}
-                                                activeTab={activeList?.id === 'binge_ready' ? 'binge_ready' : (activeList?.id === 'episodes_left' ? 'episodes_left' : 'other')}
-                                                rpdbKey={status?.rpdbKey}
-                                                isRemoving={content.ids.slug ? removingIds.includes(content.ids.slug) : false}
-                                                onMarkWatched={markAsWatched}
-                                                onRemoveHistory={removeFromHistory}
-                                                variant="vertical"
-                                                onContentClick={handleItemClick}
-                                            />
-                                        )})}
-                                        
-                                        {visibleCount < allItems.length && (
-                                            <div ref={loadMoreRef} className="col-span-full py-8 flex justify-center w-full">
-                                                <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-                                            </div>
-                                        )}
-
-                                        {allItems.length === 0 && (
-                                            <div className="col-span-full text-center py-20 bg-gray-800/30 rounded-xl border border-gray-700/50 border-dashed">
-                                                <p className="text-gray-500">No items found in this list.</p>
-                                            </div>
-                                        )}
-                                    </>
-                                );
-                            })()}
-                        </div>
+                    {loadingShows && (
+                      <div className="flex flex-col items-center justify-center py-8 space-y-3">
+                        <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-gray-400 animate-pulse">{loadingMessage}</p>
+                      </div>
                     )}
+
+                    {(() => {
+                      const allItems: DashboardItem[] = (activeList?.type === 'system'
+                        ? (activeList.id === 'binge_ready' ? bingeReadyShows : episodesLeftShows)
+                        : listItems
+                      );
+
+                      const normalizedQuery = searchQuery.toLowerCase();
+                      const filteredItems = allItems.filter((item) => {
+                        const content = item.show || ('movie' in item ? item.movie : undefined);
+                        return content && (!normalizedQuery || content.title.toLowerCase().includes(normalizedQuery));
+                      });
+
+                      if (!loadingShows && allItems.length === 0) {
+                        return (
+                          <div className="col-span-full text-center py-20 bg-gray-800/30 rounded-xl border border-gray-700/50 border-dashed">
+                            <p className="text-gray-500">No items found in this list.</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="grid grid-cols-[repeat(auto-fill,minmax(130px,1fr))] md:grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3 content-start">
+                          {activeList?.type !== 'system' && (() => {
+                            const currentList = selectedLists.find(l => l.id === activeList?.id);
+                            if (!currentList) return null;
+
+                            return (
+                              <div
+                                className={`relative flex flex-col bg-gray-800 rounded-lg overflow-hidden border transition-all cursor-pointer group ${
+                                  currentList.placeholder?.enabled
+                                    ? 'border-purple-500/50 hover:border-purple-500 hover:shadow-lg hover:shadow-purple-900/20'
+                                    : 'border-dashed border-gray-700 hover:border-gray-500 bg-gray-800/50'
+                                }`}
+                                onClick={() => activeList && openPlaceholderModal(activeList.id)}
+                              >
+                                <div className="relative w-full aspect-[2/3] bg-gray-900">
+                                  {currentList.placeholder?.enabled ? (
+                                    <>
+                                      <Image
+                                        src={currentList.placeholder?.poster || '/poster-placeholder.svg'}
+                                        alt="Placeholder"
+                                        fill
+                                        className="object-cover"
+                                        unoptimized
+                                      />
+                                      <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 backdrop-blur-sm z-10 shadow-lg bg-purple-900/80 text-purple-200">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                        Custom
+                                      </div>
+                                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <div className="bg-gray-900/80 p-2 rounded-full text-white">
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                        </div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="w-full h-full flex flex-col items-center justify-center text-center gap-2 p-3 text-gray-500 hover:text-gray-300 transition-colors">
+                                      <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center mb-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                                      </div>
+                                      <span className="text-xs font-bold">List Placeholder</span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-3 flex flex-col gap-1 flex-1 min-h-[80px]">
+                                  <h3 className="text-sm font-bold text-white leading-tight line-clamp-2 h-9 mb-0.5">
+                                    {currentList.placeholder?.title || activeList?.name}
+                                  </h3>
+                                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-400 text-[10px]">
+                                    <span className="text-gray-500 font-semibold">List Cover</span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {filteredItems.slice(0, visibleCount).map((item) => {
+                            const content = item.show || ('movie' in item ? item.movie : undefined);
+                            if (!content) return null;
+
+                            return (
+                              <ShowCard
+                                key={content.ids.trakt}
+                                item={item}
+                                activeTab={activeList?.id === 'binge_ready' ? 'binge_ready' : (activeList?.id === 'episodes_left' ? 'episodes_left' : 'other')}
+                                rpdbKey={status?.rpdbKey}
+                                isRemoving={content.ids.slug ? removingIds.includes(content.ids.slug) : false}
+                                onMarkWatched={markAsWatched}
+                                onRemoveHistory={removeFromHistory}
+                                variant="vertical"
+                                onContentClick={handleItemClick}
+                              />
+                            );
+                          })}
+
+                          {visibleCount < allItems.length && (
+                            <div ref={loadMoreRef} className="col-span-full py-8 flex justify-center w-full">
+                              <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

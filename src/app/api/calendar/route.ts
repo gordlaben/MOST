@@ -3,10 +3,28 @@ import { getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import ical from 'ical-generator';
 import { NextRequest, NextResponse } from 'next/server';
+import { createRequestContext } from '@/lib/request-logging';
+import { z } from 'zod';
+import { getAppConfig } from '@/lib/config';
+import { createServerTiming } from '@/lib/server-timing';
 
 export async function GET(request: NextRequest) {
+  const ctx = createRequestContext(request, 'api/calendar');
+  const timing = createServerTiming();
   const searchParams = request.nextUrl.searchParams;
-  const forceRefresh = searchParams.get('force') === 'true';
+  const forceParam = searchParams.get('force');
+  const querySchema = z.object({
+    force: z.enum(['true', 'false']).optional()
+  });
+
+  const parsed = querySchema.safeParse({ force: forceParam || undefined });
+  if (!parsed.success) {
+    const response = NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+    ctx.end(response.status);
+    return response;
+  }
+
+  const forceRefresh = forceParam === 'true';
 
   // Check cache first
   if (!forceRefresh) {
@@ -18,24 +36,28 @@ export async function GET(request: NextRequest) {
       const cacheAge = Date.now() - cached.updatedAt.getTime();
       // Cache for 24 hours (daily sync)
       if (cacheAge < 24 * 60 * 60 * 1000) {
-        return new NextResponse(cached.data, {
+        const response = new NextResponse(cached.data, {
           headers: {
             'Content-Type': 'text/calendar; charset=utf-8',
             'Content-Disposition': 'attachment; filename="most.ics"',
             'X-Cache': 'HIT',
           },
         });
+        timing.appendTo(response, 'calendar');
+        ctx.end(response.status);
+        return response;
       }
     }
   }
 
   const { clientId, clientSecret, accessToken } = await getTraktCredentials();
+  const { traktClientId, traktClientSecret, nextPublicBaseUrl } = getAppConfig();
 
   try {
     const trakt = new TraktClient(
-      clientId || process.env.TRAKT_CLIENT_ID || '',
-      clientSecret || process.env.TRAKT_CLIENT_SECRET || '',
-      process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
+      clientId || traktClientId || '',
+      clientSecret || traktClientSecret || '',
+      nextPublicBaseUrl,
       accessToken || undefined
     );
 
@@ -87,13 +109,16 @@ export async function GET(request: NextRequest) {
       create: { id: 'default', data: calendarData },
     });
 
-    return new NextResponse(calendarData, {
+    const response = new NextResponse(calendarData, {
       headers: {
         'Content-Type': 'text/calendar; charset=utf-8',
         'Content-Disposition': 'attachment; filename="most.ics"',
         'X-Cache': 'MISS',
       },
     });
+    timing.appendTo(response, 'calendar');
+    ctx.end(response.status);
+    return response;
   } catch (error) {
      console.error('Error generating calendar:', error);
     
@@ -103,15 +128,21 @@ export async function GET(request: NextRequest) {
      });
      
      if (cached) {
-        return new NextResponse(cached.data, {
+        const response = new NextResponse(cached.data, {
            headers: {
              'Content-Type': 'text/calendar; charset=utf-8',
              'Content-Disposition': 'attachment; filename="most.ics"',
              'X-Cache': 'STALE-ERROR',
            },
         });
+          timing.appendTo(response, 'calendar');
+          ctx.end(response.status);
+        return response;
      }
 
-     return new NextResponse('Error generating calendar', { status: 500 });
+      const response = new NextResponse('Error generating calendar', { status: 500 });
+        timing.appendTo(response, 'calendar');
+        ctx.end(response.status);
+      return response;
   }
 }

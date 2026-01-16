@@ -1192,6 +1192,8 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     renameList,
     updateList,
     createList,
-    sortPreferences
+    sortPreferences,
+    hasLoadedBinge,
+    hasLoadedEpisodes
   };
 }

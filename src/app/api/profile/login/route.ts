@@ -1,10 +1,22 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verifyPassword, createSessionToken } from '@/lib/auth';
+import { z } from 'zod';
 
 export async function POST(request: Request) {
   try {
-    const { id, password } = await request.json();
+    const body = await request.json();
+    const bodySchema = z.object({
+      id: z.string().min(1),
+      password: z.string().min(1)
+    });
+
+    const parsedBody = bodySchema.safeParse(body);
+    if (!parsedBody.success) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    const { id, password } = parsedBody.data;
 
     if (!id || !password) {
       return NextResponse.json({ error: 'ID and password are required' }, { status: 400 });

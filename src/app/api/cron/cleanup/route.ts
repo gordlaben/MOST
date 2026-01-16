@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { logger } from '@/lib/logger';
+import { createRequestContext } from '@/lib/request-logging';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
 const IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
 
-export async function GET() {
+export async function GET(request: Request) {
+  const ctx = createRequestContext(request, 'api/cron/cleanup');
   try {
-    logger.info('Starting cleanup job');
+    ctx.log.info('Starting cleanup job');
 
     // 1. Clean old cache entries (older than 7 days)
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -20,7 +21,7 @@ export async function GET() {
         }
       }
     });
-    logger.info(`Deleted ${deletedCache.count} old cache entries`);
+    ctx.log.info(`Deleted ${deletedCache.count} old cache entries`);
 
     // 2. Clean unused images
     if (fs.existsSync(IMAGES_DIR)) {
@@ -69,12 +70,16 @@ export async function GET() {
           deletedImages++;
         }
       }
-      logger.info(`Deleted ${deletedImages} unused images`);
+      ctx.log.info(`Deleted ${deletedImages} unused images`);
     }
 
-    return NextResponse.json({ success: true, message: 'Cleanup completed' });
+    const response = NextResponse.json({ success: true, message: 'Cleanup completed' });
+    ctx.end(response.status);
+    return response;
   } catch (error) {
-    logger.error('Cleanup job failed', error);
-    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+    ctx.log.error('Cleanup job failed', error);
+    const response = NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+    ctx.end(response.status);
+    return response;
   }
 }

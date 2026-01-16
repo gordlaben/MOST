@@ -2,13 +2,14 @@ import { TraktClient, TraktShow, TraktMovie, TraktBingeReadyShow, TraktEpisodeLe
 import { getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
+import { getAppConfig } from '@/lib/config';
 import { cacheImage } from '@/lib/images';
 
 export interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
   forceRefresh?: boolean;
 }
 
@@ -28,7 +29,7 @@ export async function detectAndUpdateListTypes(profileId: string, lists: any[], 
     
     if (!accessToken || !clientId || !clientSecret) return lists;
 
-    const trakt = new TraktClient(clientId, clientSecret, '', accessToken);
+    const trakt = new TraktClient(clientId, clientSecret, '', accessToken, profileId);
 
     logger.info(`Starting list type detection for profile ${profileId} (force=${forceUpdate})`);
 
@@ -120,11 +121,14 @@ export async function refreshCatalog(catalogId: string, cacheKey: string, filter
       return;
     }
 
+    const { traktClientId, traktClientSecret, nextPublicBaseUrl } = getAppConfig();
+
     const trakt = new TraktClient(
-      clientId || process.env.TRAKT_CLIENT_ID || '',
-      clientSecret || process.env.TRAKT_CLIENT_SECRET || '',
-      process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000',
-      accessToken
+      clientId || traktClientId || '',
+      clientSecret || traktClientSecret || '',
+      nextPublicBaseUrl,
+      accessToken,
+      profileId
     );
 
     let items: CatalogItem[] = [];
