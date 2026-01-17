@@ -57,7 +57,10 @@ async function callGemini(
 ): Promise<AISearchItem[]> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
-  const model = genAI.getGenerativeModel({ model: modelName });
+  const model = genAI.getGenerativeModel({
+    model: modelName,
+    generationConfig: { responseMimeType: 'application/json' }
+  });
 
   const clampedLimit = Math.max(1, Math.min(100, limit));
   const typeLine = type ? `Only return items of type '${type}'.` : 'Return both movies and shows only if clearly relevant.';
@@ -76,6 +79,19 @@ Query: ${query}`;
       .filter((item) => item && (item.type === 'movie' || item.type === 'show') && typeof item.title === 'string')
       .slice(0, clampedLimit);
   } catch (e) {
+    try {
+      const match = text.match(/\[[\s\S]*\]/);
+      if (match?.[0]) {
+        const recovered = JSON.parse(match[0]) as AISearchItem[];
+        if (Array.isArray(recovered)) {
+          return recovered
+            .filter((item) => item && (item.type === 'movie' || item.type === 'show') && typeof item.title === 'string')
+            .slice(0, clampedLimit);
+        }
+      }
+    } catch {
+      // ignore fallback parse errors
+    }
     logger.warn('Gemini returned non-JSON response', e);
     return [];
   }
