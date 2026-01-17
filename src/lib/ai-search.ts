@@ -13,6 +13,25 @@ export type AISearchItem = {
 type TraktIds = { trakt?: number; imdb?: string; tmdb?: number };
 type TraktSearchResult = { movie?: { ids?: TraktIds }; show?: { ids?: TraktIds }; ids?: TraktIds };
 
+const geminiCooldownUntil: Record<string, number> = {};
+
+function getCooldownKey(profileId?: string) {
+  return profileId || 'global';
+}
+
+function parseRetryDelayMs(message?: string) {
+  if (!message) return 60_000;
+  const match = message.match(/retry\s+in\s+([0-9.]+)s/i);
+  if (!match?.[1]) return 60_000;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds * 1000) : 60_000;
+}
+
+function isRateLimitError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('429') || message.toLowerCase().includes('too many requests') || message.toLowerCase().includes('rate limit');
+}
+
 async function getGeminiKey(profileId?: string): Promise<string | null> {
   if (profileId) {
     const profile = (await prisma.profile.findUnique({ where: { id: profileId } })) as
@@ -153,6 +172,12 @@ export async function aiSearch(
     return { results: [], usedAI: false };
   }
 
+  const cooldownKey = getCooldownKey(profileId);
+  const cooldownUntil = geminiCooldownUntil[cooldownKey];
+  if (cooldownUntil && Date.now() < cooldownUntil) {
+    return { results: [], usedAI: false };
+  }
+
   try {
     const model = await getGeminiModel(profileId);
     const items = await callGemini(query, apiKey, type, model, limit);
@@ -185,6 +210,13 @@ export async function aiSearch(
 
     return { results: deduped, usedAI: true };
   } catch (e) {
+    if (isRateLimitError(e)) {
+      const message = e instanceof Error ? e.message : String(e);
+      const retryMs = parseRetryDelayMs(message);
+      geminiCooldownUntil[cooldownKey] = Date.now() + retryMs;
+      logger.warn('Gemini rate limited; falling back to Trakt search', { retryMs });
+      return { results: [], usedAI: false };
+    }
     logger.error('Gemini search failed', e);
     return { results: [], usedAI: false };
   }
