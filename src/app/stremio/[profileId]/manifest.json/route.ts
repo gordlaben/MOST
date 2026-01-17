@@ -90,22 +90,41 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
                 const contentType = isWatchlist ? 'mixed' : (list.content_type || 'mixed');
                 const shouldSplit = contentType === 'mixed';
                 
-                if (contentType === 'series' || contentType === 'mixed') {
-                  catalogs.push({
-                    type: "series",
-                    id: list.id,
-                    name: shouldSplit && !isWatchlist ? `${list.name} (Series)` : list.name,
-                    extra: [sortExtra]
-                  });
-                }
-                
-                if (contentType === 'movie' || contentType === 'mixed') {
-                  catalogs.push({
-                    type: "movie",
-                    id: list.id,
-                    name: shouldSplit && !isWatchlist ? `${list.name} (Movies)` : list.name,
-                    extra: [sortExtra]
-                  });
+                if (isWatchlist) {
+                  if (contentType === 'movie' || contentType === 'mixed') {
+                    catalogs.push({
+                      type: "movie",
+                      id: list.id,
+                      name: list.name,
+                      extra: [sortExtra]
+                    });
+                  }
+                  if (contentType === 'series' || contentType === 'mixed') {
+                    catalogs.push({
+                      type: "series",
+                      id: list.id,
+                      name: list.name,
+                      extra: [sortExtra]
+                    });
+                  }
+                } else {
+                  if (contentType === 'series' || contentType === 'mixed') {
+                    catalogs.push({
+                      type: "series",
+                      id: list.id,
+                      name: shouldSplit ? `${list.name} (Series)` : list.name,
+                      extra: [sortExtra]
+                    });
+                  }
+                  
+                  if (contentType === 'movie' || contentType === 'mixed') {
+                    catalogs.push({
+                      type: "movie",
+                      id: list.id,
+                      name: shouldSplit ? `${list.name} (Movies)` : list.name,
+                      extra: [sortExtra]
+                    });
+                  }
                 }
             }
           }
@@ -118,22 +137,42 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
             const contentType = isWatchlist ? 'mixed' : (list.content_type || 'mixed');
             const shouldSplit = contentType === 'mixed';
             
-            if (contentType === 'series' || contentType === 'mixed') {
-              catalogs.push({
-                type: "series",
-                id: list.id,
-                name: shouldSplit && !isWatchlist ? `${list.name} (Series)` : list.name,
-                extra: [sortExtra]
-              });
-            }
+            if (isWatchlist) {
+              if (contentType === 'movie' || contentType === 'mixed') {
+                catalogs.push({
+                  type: "movie",
+                  id: list.id,
+                  name: list.name,
+                  extra: [sortExtra]
+                });
+              }
 
-            if (contentType === 'movie' || contentType === 'mixed') {
-              catalogs.push({
-                type: "movie",
-                id: list.id,
-                name: shouldSplit && !isWatchlist ? `${list.name} (Movies)` : list.name,
-                extra: [sortExtra]
-              });
+              if (contentType === 'series' || contentType === 'mixed') {
+                catalogs.push({
+                  type: "series",
+                  id: list.id,
+                  name: list.name,
+                  extra: [sortExtra]
+                });
+              }
+            } else {
+              if (contentType === 'series' || contentType === 'mixed') {
+                catalogs.push({
+                  type: "series",
+                  id: list.id,
+                  name: shouldSplit ? `${list.name} (Series)` : list.name,
+                  extra: [sortExtra]
+                });
+              }
+
+              if (contentType === 'movie' || contentType === 'mixed') {
+                catalogs.push({
+                  type: "movie",
+                  id: list.id,
+                  name: shouldSplit ? `${list.name} (Movies)` : list.name,
+                  extra: [sortExtra]
+                });
+              }
             }
           }
         });
