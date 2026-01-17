@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   let includeReturning = (await getSetting('FILTER_INCLUDE_RETURNING')) !== 'false';
   let sortBy = (await getSetting('FILTER_SORT_BY')) || 'newest';
   let sortPreferences: Record<string, string> = {};
+  let dateFormat = (await getSetting('DATE_FORMAT')) || 'mdy';
   let selectedLists: unknown[] = [];
 
   if (profileId) {
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
         includeReturning = filters.includeReturning;
         sortBy = filters.sortBy || 'newest';
         sortPreferences = filters.sortPreferences || {};
+        if (filters.dateFormat) dateFormat = filters.dateFormat;
       }
       if (profile.selectedLists) {
         selectedLists = JSON.parse(profile.selectedLists);
@@ -51,7 +53,8 @@ export async function GET(request: Request) {
       includeCanceled,
       includeReturning,
       sortBy,
-      sortPreferences
+      sortPreferences,
+      dateFormat
     },
     selectedLists
   });
@@ -68,7 +71,8 @@ export async function POST(request: Request) {
       FILTER_INCLUDE_CANCELED, 
       FILTER_INCLUDE_RETURNING, 
       FILTER_SORT_BY,
-      listId 
+        listId,
+        DATE_FORMAT
   } = body;
 
   // Note: Trakt Client ID and Secret are no longer saved via API.
@@ -108,6 +112,10 @@ export async function POST(request: Request) {
         }
     }
 
+    if (DATE_FORMAT !== undefined) {
+      currentFilters.dateFormat = DATE_FORMAT;
+    }
+
     updateData.filters = JSON.stringify(currentFilters);
 
     await prisma.profile.update({
@@ -125,6 +133,7 @@ export async function POST(request: Request) {
       if (filters.includeCanceled !== undefined) await setSetting('FILTER_INCLUDE_CANCELED', String(filters.includeCanceled));
       if (filters.includeReturning !== undefined) await setSetting('FILTER_INCLUDE_RETURNING', String(filters.includeReturning));
       if (filters.sortBy !== undefined) await setSetting('FILTER_SORT_BY', filters.sortBy);
+      if (filters.dateFormat !== undefined) await setSetting('DATE_FORMAT', filters.dateFormat);
     }
 
     // Handle flat filter keys (sent from dashboard "Save as Default")
@@ -133,6 +142,7 @@ export async function POST(request: Request) {
     if (FILTER_INCLUDE_RETURNING !== undefined) await setSetting('FILTER_INCLUDE_RETURNING', String(FILTER_INCLUDE_RETURNING));
     
     if (FILTER_SORT_BY !== undefined && !listId) await setSetting('FILTER_SORT_BY', FILTER_SORT_BY);
+    if (DATE_FORMAT !== undefined) await setSetting('DATE_FORMAT', DATE_FORMAT);
   }
 
   return NextResponse.json({ success: true });

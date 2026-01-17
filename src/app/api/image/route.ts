@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const url = searchParams.get('url');
   const fallback = searchParams.get('fallback');
+  const profileId = searchParams.get('profileId') || undefined;
 
   if (!url) {
     return new NextResponse('Missing url parameter', { status: 400 });
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Check if we have it locally
-    const cachedMeta = await getImageMetaIfCached(url);
+    const cachedMeta = await getImageMetaIfCached(url, profileId);
 
     if (cachedMeta) {
         const ifNoneMatch = request.headers.get('if-none-match');
@@ -39,7 +40,7 @@ export async function GET(request: NextRequest) {
             headers: {
               'ETag': cachedMeta.etag,
               'Last-Modified': cachedMeta.lastModified,
-              'Cache-Control': 'public, max-age=31536000, immutable',
+              'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
               'Access-Control-Allow-Origin': '*'
             }
           });
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
               headers: {
                 'ETag': cachedMeta.etag,
                 'Last-Modified': cachedMeta.lastModified,
-                'Cache-Control': 'public, max-age=31536000, immutable',
+                'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
                 'Access-Control-Allow-Origin': '*'
               }
             });
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
         return new NextResponse(webStream as unknown as BodyInit, {
           headers: {
             'Content-Type': cachedMeta.contentType,
-            'Cache-Control': 'public, max-age=31536000, immutable',
+            'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
             'ETag': cachedMeta.etag,
             'Last-Modified': cachedMeta.lastModified,
             'Access-Control-Allow-Origin': '*',
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Not cached? Trigger background download and Redirect immediately
     // Don't await this! Fire and forget.
-    void cacheImage(url);
+    void cacheImage(url, profileId);
 
     // Redirect to the fallback (if available) or original URL so the user sees the image NOW
     // Using fallback prevents hitting API limits on the provider (e.g. RPDB) from the client

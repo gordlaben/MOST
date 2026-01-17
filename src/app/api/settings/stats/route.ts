@@ -3,6 +3,26 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { CatalogItem } from '@/lib/catalog';
 
+type ContentIds = { trakt?: number; imdb?: string; tmdb?: number };
+type ContentWithIds = { ids?: ContentIds; type?: 'movie' | 'show' };
+
+function getContentFromItem(item: CatalogItem): { content: ContentWithIds | null; kind: 'movie' | 'show' | null } {
+  if ('show' in item && item.show) {
+    const showContent = item.show as ContentWithIds;
+    if (showContent.type === 'movie') {
+      return { content: showContent, kind: 'movie' };
+    }
+    return { content: showContent, kind: 'show' };
+  }
+
+  if ('movie' in item && item.movie) {
+    const movieContent = item.movie as ContentWithIds;
+    return { content: movieContent, kind: 'movie' };
+  }
+
+  return { content: null, kind: null };
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const profileId = searchParams.get('profileId');
@@ -38,15 +58,13 @@ export async function GET(request: Request) {
       const items: CatalogItem[] = JSON.parse(entry.data);
       if (Array.isArray(items)) {
         items.forEach(item => {
-          // Normalized list items keep everything in `show` but have a `type`
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const content = (item as any).show || (item as any).movie || item;
+          const { content, kind } = getContentFromItem(item);
           const ids = content?.ids;
 
-          if (content?.type === 'movie' || ('movie' in item && (item as any).movie)) {
+          if (kind === 'movie') {
             const movieKey = ids?.trakt ? `trakt:${ids.trakt}` : (ids?.imdb ? `imdb:${ids.imdb}` : (ids?.tmdb ? `tmdb:${ids.tmdb}` : null));
             if (movieKey) movieIds.add(movieKey);
-          } else if (content?.type === 'show' || ('show' in item && (item as any).show)) {
+          } else if (kind === 'show') {
             const showKey = ids?.trakt ? `trakt:${ids.trakt}` : (ids?.imdb ? `imdb:${ids.imdb}` : (ids?.tmdb ? `tmdb:${ids.tmdb}` : null));
             if (showKey) showIds.add(showKey);
           }

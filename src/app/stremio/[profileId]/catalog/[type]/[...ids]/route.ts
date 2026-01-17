@@ -3,7 +3,7 @@ import { TraktClient, TraktShow, TraktMovie, TraktBingeReadyShow, TraktEpisodeLe
 import { getTraktCredentials, getProfile } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { cacheImage } from '@/lib/images';
+import { prefetchImages } from '@/lib/images';
 import { mapTraktItemToMeta, StremioMeta } from '@/lib/stremio';
 
 // In-memory lock to prevent concurrent refreshes
@@ -124,7 +124,7 @@ async function refreshCatalog(catalogId: string, cacheKey: string, filters: Cata
     (async () => {
       try {
         logger.info(`Starting background image caching for ${cacheKey}`);
-        let count = 0;
+        const posterUrls: string[] = [];
         for (const item of items) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const content = (('show' in item && item.show) || ('movie' in item && item.movie) || item) as any;
@@ -139,12 +139,12 @@ async function refreshCatalog(catalogId: string, cacheKey: string, filters: Cata
              }
 
              if (posterUrl) {
-               await cacheImage(posterUrl);
-               count++;
+               posterUrls.push(posterUrl);
              }
           }
         }
-        logger.info(`Cached ${count} images for ${cacheKey}`);
+        await prefetchImages(posterUrls, profileId, 20);
+        logger.info(`Queued ${posterUrls.length} images for ${cacheKey}`);
       } catch (e) {
         logger.error(`Failed to cache images for ${cacheKey}`, e);
       }
@@ -206,7 +206,7 @@ export async function GET(
         }
 
         const metas = searchResults.map((item: CatalogItem) => 
-            mapTraktItemToMeta(item, type, rpdbKey, origin, undefined, false)
+          mapTraktItemToMeta(item, type, rpdbKey, origin, undefined, false, profileId)
         );
 
         return NextResponse.json({ metas }, {
@@ -357,7 +357,7 @@ export async function GET(
 
     // Map to Stremio format
     const metas = items.map((item: CatalogItem) => 
-        mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true)
+      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true, profileId)
     );
 
   // Inject user-defined placeholder if configured
@@ -390,7 +390,8 @@ export async function GET(
                   } else if (posterUrl.startsWith('http')) {
                       // Only proxy if not already using our proxy to avoid recursion
                       if (!posterUrl.includes('/api/image?url=')) {
-                        posterUrl = `${origin}/api/image?url=${encodeURIComponent(posterUrl)}`;
+                        const profileParam = profileId ? `&profileId=${encodeURIComponent(profileId)}` : '';
+                        posterUrl = `${origin}/api/image?url=${encodeURIComponent(posterUrl)}${profileParam}`;
                       }
                   }
 

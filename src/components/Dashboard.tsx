@@ -45,7 +45,7 @@ interface SortableListProps extends Omit<HorizontalListProps, 'dragHandle' | 'li
 type DashboardItem = TraktBingeReadyShow | TraktEpisodeLeftShow | TraktListItem;
 
 
-function SortableHorizontalListWrapper({ list, listVersions, currentSort, filters, ...props }: SortableListProps & { currentSort?: string; filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean } }) {
+function SortableHorizontalListWrapper({ list, listVersions, currentSort, filters, dateFormat, ...props }: SortableListProps & { currentSort?: string; filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean }; dateFormat?: import('@/lib/date-format').DateFormat }) {
   const {
     attributes,
     listeners,
@@ -89,6 +89,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
               version={listVersions?.[list.id] || 0}
               sortBy={currentSort}
               filters={filters}
+              dateFormat={dateFormat}
               {...props} 
             />
             <HorizontalList 
@@ -98,6 +99,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
               version={listVersions?.[list.id] || 0}
               sortBy={currentSort}
               filters={filters}
+              dateFormat={dateFormat}
               {...props} 
             />
           </>
@@ -110,6 +112,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
               version={listVersions?.[list.id] || 0}
               sortBy={currentSort}
               filters={filters}
+              dateFormat={dateFormat}
               {...props} 
             />
             <HorizontalList 
@@ -119,6 +122,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
               version={listVersions?.[list.id] || 0}
               sortBy={currentSort}
               filters={filters}
+              dateFormat={dateFormat}
               {...props} 
             />
           </>
@@ -135,6 +139,7 @@ function SortableHorizontalListWrapper({ list, listVersions, currentSort, filter
             version={listVersions?.[list.id] || 0}
             sortBy={currentSort}
             filters={filters}
+          dateFormat={dateFormat}
             {...props} 
         />
     </div>
@@ -147,6 +152,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   const {
     calendarUrl,
     stremioUrl,
+    dateFormat,
     status,
     stats,
     bingeReadyShows,
@@ -497,7 +503,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [profileId, fanarts]);
+  }, [profileId, fanarts, bgImage]);
 
   if (!profileId && !isAuthorized) {
     return (
@@ -1105,6 +1111,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                             listVersions={listVersions}
                                             currentSort={sortPreferences?.[list.id] || 'newest'}
                                             filters={activeFilters}
+                                          dateFormat={dateFormat}
                                         />
                                     );
                                 })}
@@ -1502,6 +1509,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                 onRemoveHistory={removeFromHistory}
                                 variant="vertical"
                                 onContentClick={handleItemClick}
+                                dateFormat={dateFormat}
                               />
                             );
                           })}
@@ -1655,6 +1663,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
             profileId={profileId || undefined}
             onWatchlistChange={() => refreshList('watchlist')}
             rpdbKey={status?.rpdbKey}
+          dateFormat={dateFormat}
         />
 
 

@@ -55,6 +55,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
   const [calendarUrl, setCalendarUrl] = useState<string>('');
   const [stremioUrl, setStremioUrl] = useState<string>('');
   const [status, setStatus] = useState<{ isConnected: boolean; hasCredentials: boolean; rpdbKey?: string } | null>(null);
+  const [dateFormat, setDateFormat] = useState<'mdy' | 'dmy' | 'ymd'>('mdy');
   const [stats, setStats] = useState<{ username: string; totalShows: number; lastWatched: string; avatar?: string } | null>(null);
   const [bingeReadyShows, setBingeReadyShows] = useState<TraktBingeReadyShow[]>([]);
   const [episodesLeftShows, setEpisodesLeftShows] = useState<TraktEpisodeLeftShow[]>([]);
@@ -397,6 +398,9 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
             if (data.filters.sortPreferences) {
                 setSortPreferences(data.filters.sortPreferences);
             }
+          if (data.filters.dateFormat) {
+            setDateFormat(data.filters.dateFormat);
+          }
         }
 
         if (data.selectedLists && data.selectedLists.length > 0) {
@@ -1111,6 +1115,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     refreshList,
     calendarUrl,
     stremioUrl,
+    dateFormat,
     status,
     stats,
     bingeReadyShows,

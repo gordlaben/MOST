@@ -6,7 +6,17 @@ import { prisma } from '@/lib/db';
 import { getSetting } from '@/lib/settings';
 import type { CatalogItem } from '@/lib/catalog';
 
-const IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
+const BASE_IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
+const INDEX_FILENAME = '_index.json';
+const ERROR_LOG_PATH = path.join(BASE_IMAGES_DIR, '_errors.json');
+
+function getImagesDir(profileId: string): string {
+  const profileDir = path.join(BASE_IMAGES_DIR, profileId);
+  if (fs.existsSync(profileDir)) {
+    return profileDir;
+  }
+  return BASE_IMAGES_DIR;
+}
 
 function normalizeUrl(url: string): string {
   if (url.startsWith('//')) {
@@ -96,44 +106,103 @@ async function getUsedPosterHashes(profileId: string): Promise<Set<string>> {
   return used;
 }
 
-async function getCacheStats(profileId: string) {
-  const usedHashes = await getUsedPosterHashes(profileId);
-
-  let totalCount = 0;
-  let totalBytes = 0;
-  let unusedCount = 0;
-  let unusedBytes = 0;
-
-  if (!fs.existsSync(IMAGES_DIR)) {
-    return { totalCount, totalBytes, unusedCount, unusedBytes, usedCount: 0, usedBytes: 0 };
+async function readIndex(imagesDir: string): Promise<Map<string, { size: number; file: string }>> {
+  const indexPath = path.join(imagesDir, INDEX_FILENAME);
+  if (fs.existsSync(indexPath)) {
+    try {
+      const raw = await fs.promises.readFile(indexPath, 'utf-8');
+      const data = JSON.parse(raw) as Record<string, { size: number; file: string }>;
+      return new Map(Object.entries(data));
+    } catch {
+      // fall through to rebuild
+    }
   }
 
-  const files = await fs.promises.readdir(IMAGES_DIR);
+  const indexMap = new Map<string, { size: number; file: string }>();
+  if (!fs.existsSync(imagesDir)) {
+    return indexMap;
+  }
+
+  const files = await fs.promises.readdir(imagesDir);
   for (const file of files) {
-    const filePath = path.join(IMAGES_DIR, file);
+    if (file === INDEX_FILENAME) continue;
+    const filePath = path.join(imagesDir, file);
     let stat: fs.Stats;
     try {
       stat = await fs.promises.stat(filePath);
     } catch {
       continue;
     }
-
     if (!stat.isFile()) continue;
-
-    totalCount++;
-    totalBytes += stat.size;
-
     const hash = path.parse(file).name;
+    indexMap.set(hash, { size: stat.size, file });
+  }
+
+  try {
+    const obj = Object.fromEntries(indexMap.entries());
+    await fs.promises.writeFile(indexPath, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch {
+    // ignore index write errors
+  }
+
+  return indexMap;
+}
+
+async function writeIndex(imagesDir: string, indexMap: Map<string, { size: number; file: string }>) {
+  const indexPath = path.join(imagesDir, INDEX_FILENAME);
+  try {
+    const obj = Object.fromEntries(indexMap.entries());
+    await fs.promises.writeFile(indexPath, JSON.stringify(obj, null, 2), 'utf-8');
+  } catch {
+    // ignore index write errors
+  }
+}
+
+async function readLastError() {
+  if (!fs.existsSync(ERROR_LOG_PATH)) {
+    return { errorCount: 0, lastError: null as null | { url: string; reason: string; at: string } };
+  }
+  try {
+    const raw = await fs.promises.readFile(ERROR_LOG_PATH, 'utf-8');
+    const data = JSON.parse(raw) as Array<{ url: string; reason: string; at: string }>;
+    return { errorCount: data.length || 0, lastError: data[0] || null };
+  } catch {
+    return { errorCount: 0, lastError: null as null | { url: string; reason: string; at: string } };
+  }
+}
+
+async function getCacheStats(profileId: string) {
+  const usedHashes = await getUsedPosterHashes(profileId);
+
+  const imagesDir = getImagesDir(profileId);
+  const indexMap = await readIndex(imagesDir);
+
+  let totalCount = 0;
+  let totalBytes = 0;
+  let unusedCount = 0;
+  let unusedBytes = 0;
+  let missingCount = 0;
+
+  for (const [hash, entry] of indexMap.entries()) {
+    totalCount++;
+    totalBytes += entry.size;
     if (!usedHashes.has(hash)) {
       unusedCount++;
-      unusedBytes += stat.size;
+      unusedBytes += entry.size;
+    }
+  }
+
+  for (const hash of usedHashes) {
+    if (!indexMap.has(hash)) {
+      missingCount++;
     }
   }
 
   const usedCount = totalCount - unusedCount;
   const usedBytes = totalBytes - unusedBytes;
+  const { errorCount, lastError } = await readLastError();
 
-  return { totalCount, totalBytes, unusedCount, unusedBytes, usedCount, usedBytes };
+  return { totalCount, totalBytes, unusedCount, unusedBytes, usedCount, usedBytes, missingCount, errorCount, lastError };
 }
 
 export async function GET(request: Request) {
@@ -161,35 +230,27 @@ export async function POST(request: Request) {
   }
 
   const usedHashes = await getUsedPosterHashes(profileId);
+  const imagesDir = getImagesDir(profileId);
+  const indexMap = await readIndex(imagesDir);
 
   let removedCount = 0;
   let removedBytes = 0;
 
-  if (fs.existsSync(IMAGES_DIR)) {
-    const files = await fs.promises.readdir(IMAGES_DIR);
-    for (const file of files) {
-      const filePath = path.join(IMAGES_DIR, file);
-      let stat: fs.Stats;
+  for (const [hash, entry] of indexMap.entries()) {
+    if (!usedHashes.has(hash)) {
+      const filePath = path.join(imagesDir, entry.file);
       try {
-        stat = await fs.promises.stat(filePath);
+        await fs.promises.unlink(filePath);
+        removedCount++;
+        removedBytes += entry.size;
+        indexMap.delete(hash);
       } catch {
-        continue;
-      }
-
-      if (!stat.isFile()) continue;
-
-      const hash = path.parse(file).name;
-      if (!usedHashes.has(hash)) {
-        try {
-          await fs.promises.unlink(filePath);
-          removedCount++;
-          removedBytes += stat.size;
-        } catch {
-          // ignore delete errors
-        }
+        // ignore delete errors
       }
     }
   }
+
+  await writeIndex(imagesDir, indexMap);
 
   const stats = await getCacheStats(profileId);
 

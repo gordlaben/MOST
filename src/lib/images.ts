@@ -4,7 +4,8 @@ import crypto from 'crypto';
 import sharp from 'sharp';
 import { logger } from './logger';
 
-const IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
+const BASE_IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
+const ERROR_LOG_PATH = path.join(BASE_IMAGES_DIR, '_errors.json');
 const pendingDownloads = new Map<string, Promise<string | null>>();
 const URL_CACHE_LIMIT = 2000;
 const META_CACHE_LIMIT = 2000;
@@ -13,6 +14,8 @@ let activeDownloads = 0;
 const downloadQueue: Array<() => void> = [];
 const urlToPathCache = new Map<string, string>();
 const pathMetaCache = new Map<string, CachedImageMeta>();
+let errorLogWrite = Promise.resolve();
+let indexWrite = Promise.resolve();
 
 interface CachedImageMeta {
   filePath: string;
@@ -23,9 +26,22 @@ interface CachedImageMeta {
   mtimeMs: number;
 }
 
-// Ensure directory exists
-if (!fs.existsSync(IMAGES_DIR)) {
-  fs.mkdirSync(IMAGES_DIR, { recursive: true });
+// Ensure base directory exists
+if (!fs.existsSync(BASE_IMAGES_DIR)) {
+  fs.mkdirSync(BASE_IMAGES_DIR, { recursive: true });
+}
+
+function getImagesDir(profileId?: string): string {
+  if (!profileId) return BASE_IMAGES_DIR;
+  const dir = path.join(BASE_IMAGES_DIR, profileId);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+function getCacheKey(url: string, profileId?: string) {
+  return `${profileId || 'global'}|${url}`;
 }
 
 function normalizeUrl(url: string): string {
@@ -96,28 +112,69 @@ async function getCachedMetaByPath(filePath: string): Promise<CachedImageMeta | 
   }
 }
 
-export async function cacheImage(url: string): Promise<string | null> {
+async function recordCacheError(url: string, reason: string) {
+  const entry = { url, reason, at: new Date().toISOString() };
+  errorLogWrite = errorLogWrite.then(async () => {
+    try {
+      let existing: Array<{ url: string; reason: string; at: string }> = [];
+      if (fs.existsSync(ERROR_LOG_PATH)) {
+        const raw = await fs.promises.readFile(ERROR_LOG_PATH, 'utf-8');
+        existing = JSON.parse(raw) || [];
+      }
+      existing.unshift(entry);
+      if (existing.length > 25) {
+        existing = existing.slice(0, 25);
+      }
+      await fs.promises.writeFile(ERROR_LOG_PATH, JSON.stringify(existing, null, 2), 'utf-8');
+    } catch (e) {
+      logger.warn('Failed to write cache error log', e);
+    }
+  });
+  await errorLogWrite;
+}
+
+async function updateIndex(imagesDir: string, hash: string, size: number, file: string) {
+  const indexPath = path.join(imagesDir, '_index.json');
+  indexWrite = indexWrite.then(async () => {
+    try {
+      let existing: Record<string, { size: number; file: string }> = {};
+      if (fs.existsSync(indexPath)) {
+        const raw = await fs.promises.readFile(indexPath, 'utf-8');
+        existing = JSON.parse(raw) || {};
+      }
+      existing[hash] = { size, file };
+      await fs.promises.writeFile(indexPath, JSON.stringify(existing, null, 2), 'utf-8');
+    } catch (e) {
+      logger.warn('Failed to update cache index', e);
+    }
+  });
+  await indexWrite;
+}
+
+export async function cacheImage(url: string, profileId?: string): Promise<string | null> {
   if (!url) return null;
 
   url = normalizeUrl(url);
 
-  const existingPromise = pendingDownloads.get(url);
+  const cacheKey = getCacheKey(url, profileId);
+  const existingPromise = pendingDownloads.get(cacheKey);
   if (existingPromise) {
     return existingPromise;
   }
 
   const promise = (async () => {
     try {
+      const imagesDir = getImagesDir(profileId);
       // Create a hash of the URL to use as filename
       const hash = crypto.createHash('md5').update(url).digest('hex');
 
       // Check if file exists with any common extension
       for (const ext of ['.jpg', '.png', '.webp', '.jpeg']) {
         const existingFilename = `${hash}${ext}`;
-        const existingPath = path.join(IMAGES_DIR, existingFilename);
+        const existingPath = path.join(imagesDir, existingFilename);
         try {
           await fs.promises.access(existingPath);
-          touchMap(urlToPathCache, url, existingPath, URL_CACHE_LIMIT);
+          touchMap(urlToPathCache, cacheKey, existingPath, URL_CACHE_LIMIT);
           return existingFilename;
         } catch {
           // Continue checking
@@ -126,7 +183,7 @@ export async function cacheImage(url: string): Promise<string | null> {
 
       // File does not exist, proceed to download
       const filename = `${hash}.jpg`;
-      const filePath = path.join(IMAGES_DIR, filename);
+      const filePath = path.join(imagesDir, filename);
 
       let written = false;
       await withDownloadSlot(async () => {
@@ -138,6 +195,7 @@ export async function cacheImage(url: string): Promise<string | null> {
         });
         if (!response.ok) {
           logger.warn(`Failed to fetch image: ${url} (${response.status})`);
+          await recordCacheError(url, `HTTP ${response.status}`);
           return;
         }
 
@@ -162,58 +220,77 @@ export async function cacheImage(url: string): Promise<string | null> {
         return null;
       }
 
-      touchMap(urlToPathCache, url, filePath, URL_CACHE_LIMIT);
+      touchMap(urlToPathCache, cacheKey, filePath, URL_CACHE_LIMIT);
       void getCachedMetaByPath(filePath); // warm meta cache
+      const stat = await fs.promises.stat(filePath);
+      void updateIndex(imagesDir, hash, stat.size, path.basename(filePath));
       return filename;
     } catch (error) {
       logger.error(`Error caching image ${url}:`, error);
+      await recordCacheError(url, 'Exception during cacheImage');
       return null;
     } finally {
-      pendingDownloads.delete(url);
+      pendingDownloads.delete(cacheKey);
     }
   })();
 
-  pendingDownloads.set(url, promise);
+  pendingDownloads.set(cacheKey, promise);
   return promise;
 }
 
 export function getCachedImagePath(filename: string): string | null {
-  const filePath = path.join(IMAGES_DIR, filename);
+  const filePath = path.join(BASE_IMAGES_DIR, filename);
   if (fs.existsSync(filePath)) {
     return filePath;
   }
   return null;
 }
 
-export async function getImagePathIfCached(url: string): Promise<string | null> {
+export async function getImagePathIfCached(url: string, profileId?: string): Promise<string | null> {
   if (!url) return null;
 
   url = normalizeUrl(url);
 
-  const cachedPath = urlToPathCache.get(url);
+  const cacheKey = getCacheKey(url, profileId);
+  const cachedPath = urlToPathCache.get(cacheKey);
   if (cachedPath) {
-    touchMap(urlToPathCache, url, cachedPath, URL_CACHE_LIMIT);
+    touchMap(urlToPathCache, cacheKey, cachedPath, URL_CACHE_LIMIT);
     return cachedPath;
   }
 
   const hash = crypto.createHash('md5').update(url).digest('hex');
 
-  for (const ext of ['.jpg', '.png', '.webp', '.jpeg']) {
-    const filename = `${hash}${ext}`;
-    const filePath = path.join(IMAGES_DIR, filename);
-    try {
-      await fs.promises.access(filePath);
-      touchMap(urlToPathCache, url, filePath, URL_CACHE_LIMIT);
-      return filePath;
-    } catch {
-      continue;
+  const dirs = profileId ? [getImagesDir(profileId), BASE_IMAGES_DIR] : [BASE_IMAGES_DIR];
+  for (const dir of dirs) {
+    for (const ext of ['.jpg', '.png', '.webp', '.jpeg']) {
+      const filename = `${hash}${ext}`;
+      const filePath = path.join(dir, filename);
+      try {
+        await fs.promises.access(filePath);
+        touchMap(urlToPathCache, cacheKey, filePath, URL_CACHE_LIMIT);
+        return filePath;
+      } catch {
+        continue;
+      }
     }
   }
   return null;
 }
 
-export async function getImageMetaIfCached(url: string): Promise<CachedImageMeta | null> {
-  const filePath = await getImagePathIfCached(url);
+export async function getImageMetaIfCached(url: string, profileId?: string): Promise<CachedImageMeta | null> {
+  const filePath = await getImagePathIfCached(url, profileId);
   if (!filePath) return null;
   return getCachedMetaByPath(filePath);
+}
+
+export async function prefetchImages(urls: string[], profileId?: string, delayMs: number = 15, maxItems: number = 800) {
+  if (!urls || urls.length === 0) return;
+  const unique = Array.from(new Set(urls.filter(Boolean)));
+  const capped = unique.slice(0, maxItems);
+  for (const url of capped) {
+    void cacheImage(url, profileId);
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
 }

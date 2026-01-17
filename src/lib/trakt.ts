@@ -782,7 +782,6 @@ export class TraktClient {
       return items.filter(item => {
           // Type Filter
           if (filters.type) {
-              const itemType = item.type; // 'movie' or 'show' usually
               // Or check presence of keys
               const isMovie = item.movie || item.type === 'movie';
               const isShow = item.show || item.type === 'show';

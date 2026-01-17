@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
-import { cacheImage } from '@/lib/images';
+import { prefetchImages } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     (async () => {
       try {
         logger.info(`Starting background image caching for list ${listId}`);
-        let count = 0;
+        const posterUrls: string[] = [];
         for (const item of items) {
           const content = item.show || item.movie;
           if (content?.images?.poster) {
@@ -104,12 +104,12 @@ export async function POST(request: Request) {
              }
 
              if (posterUrl) {
-               await cacheImage(posterUrl);
-               count++;
+               posterUrls.push(posterUrl);
              }
           }
         }
-        logger.info(`Cached ${count} images for list ${listId}`);
+        await prefetchImages(posterUrls, profileId, 20);
+        logger.info(`Queued ${posterUrls.length} images for list ${listId}`);
       } catch (e) {
         logger.error(`Failed to cache images for list ${listId}`, e);
       }

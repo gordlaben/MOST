@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import type { TraktShow, TraktMovie, TraktList } from '@/lib/trakt';
+import { formatDate, type DateFormat } from '@/lib/date-format';
 
 type TraktContent = TraktShow | TraktMovie | (TraktShow & { type: 'show' }) | (TraktMovie & { type: 'movie' });
 
@@ -16,6 +17,7 @@ interface InfoModalProps {
   onWatchlistChange?: () => void;
   rpdbKey?: string;
   initialPosterUrl?: string | null;
+    dateFormat?: DateFormat;
 }
 
 export default function InfoModal({ 
@@ -27,7 +29,8 @@ export default function InfoModal({
   profileId,
   onWatchlistChange,
   rpdbKey,
-  initialPosterUrl
+    initialPosterUrl,
+    dateFormat = 'mdy'
 }: InfoModalProps) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -208,6 +211,8 @@ export default function InfoModal({
   const runtime = content.runtime ? `${content.runtime} min` : null;
   const genres = content.genres ? content.genres.slice(0, 3).join(', ') : null;
   const certification = content.certification;
+    const rawDate = data?.first_aired || data?.released || data?.release_date || content?.released || content?.first_aired;
+    const formattedDate = formatDate(rawDate, dateFormat);
   
   // Poster logic
   let posterUrl = null;
@@ -299,7 +304,7 @@ export default function InfoModal({
                          {certification && <span className="px-2 py-0.5 border border-gray-600 rounded">{certification}</span>}
                          {runtime && <span>{runtime}</span>}
                          {data?.status && <span className={`px-2 py-0.5 rounded ${data.status === 'ended' || data.status === 'canceled' ? 'bg-red-900/40 text-red-400' : 'bg-green-900/40 text-green-400'}`}>{data.status}</span>}
-                         {new Date(data?.first_aired).toLocaleDateString()}
+                         {formattedDate && <span>{formattedDate}</span>}
                      </div>
                  </div>
 

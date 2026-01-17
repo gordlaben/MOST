@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TraktBingeReadyShow, TraktEpisodeLeftShow } from '@/lib/trakt';
 import { getProfile } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -184,7 +183,7 @@ export async function GET(
     // Map to Stremio format
     const origin = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const metas: StremioMeta[] = items.map((item: CatalogItem) => (
-      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true)
+      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true, profileId)
     ));
 
   // Inject user-defined placeholder if configured
