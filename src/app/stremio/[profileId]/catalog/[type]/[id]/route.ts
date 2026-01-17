@@ -3,7 +3,7 @@ import { TraktBingeReadyShow, TraktEpisodeLeftShow } from '@/lib/trakt';
 import { getProfile } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
-import { StremioMeta } from '@/lib/stremio';
+import { mapTraktItemToMeta, StremioMeta } from '@/lib/stremio';
 import { CatalogFilters, CatalogItem, refreshCatalog } from '@/lib/catalog';
 
 interface SelectedList {
@@ -182,61 +182,10 @@ export async function GET(
   }
 
     // Map to Stremio format
-    const metas: StremioMeta[] = items.map((item: CatalogItem) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const content = (item as any).show || (item as any).movie || item;
-      let poster = null;
-      
-      if (content.images?.poster) {
-        if (Array.isArray(content.images.poster) && content.images.poster.length > 0) {
-          poster = content.images.poster[0];
-        } else if (!Array.isArray(content.images.poster) && typeof content.images.poster === 'object' && content.images.poster.thumb) {
-          poster = content.images.poster.thumb;
-        } else if (typeof content.images.poster === 'string') {
-          poster = content.images.poster;
-        }
-      }
-  
-      if (poster && !poster.startsWith('http')) {
-        poster = `https://${poster}`;
-      }
-  
-      if (rpdbKey && rpdbKey !== 'disabled' && content.ids) {
-        if (content.ids.imdb) {
-          poster = `https://api.ratingposterdb.com/${rpdbKey}/imdb/poster-default/${content.ids.imdb}.jpg`;
-        } else if (content.ids.tmdb) {
-          poster = `https://api.ratingposterdb.com/${rpdbKey}/tmdb/poster-default/${content.ids.tmdb}.jpg`;
-        } else if (content.ids.tvdb) {
-          poster = `https://api.ratingposterdb.com/${rpdbKey}/tvdb/poster-default/${content.ids.tvdb}.jpg`;
-        }
-      }
-  
-      // Use local proxy for caching
-      if (poster) {
-          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
-          poster = `${baseUrl}/api/image?url=${encodeURIComponent(poster)}`;
-      }
-  
-      let description = '';
-      if (catalogId === 'binge_ready') {
-          const brItem = item as TraktBingeReadyShow;
-          description = `Season ${brItem.latestSeason} is ready to binge! (${brItem.totalEpisodes} episodes)`;
-      } else if (catalogId === 'episodes_left') {
-          const elItem = item as TraktEpisodeLeftShow;
-          description = `${(elItem.totalEpisodes || 0) - elItem.watchedEpisodes} episodes left to watch. Last watched: ${new Date(elItem.releaseDate).toLocaleDateString('de-DE')}`;
-      } else {
-          description = content.year ? `${content.year}` : '';
-      }
-  
-      return {
-        id: content.ids.imdb || `tt${content.ids.tmdb}` || `trakt:${content.ids.trakt}`,
-        type: type,
-        name: content.title,
-        poster: poster,
-        description: description,
-        releaseInfo: catalogId === 'binge_ready' || catalogId === 'episodes_left' ? `${item.latestSeason}` : (content.year ? `${content.year}` : ''),
-      };
-    });
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
+    const metas: StremioMeta[] = items.map((item: CatalogItem) => (
+      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true)
+    ));
 
   // Inject user-defined placeholder if configured
   if (profileId) {

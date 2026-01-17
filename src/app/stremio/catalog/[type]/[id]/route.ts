@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TraktClient, TraktBingeReadyShow, TraktEpisodeLeftShow } from '@/lib/trakt';
 import { getTraktCredentials, getSetting } from '@/lib/settings';
-import { StremioMeta } from '@/lib/stremio';
+import { mapTraktItemToMeta, StremioMeta } from '@/lib/stremio';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 
@@ -130,54 +130,10 @@ export async function GET(
   const rpdbKey = (await getSetting('RPDB_API_KEY')) || 't0-free-rpdb';
 
   // Map to Stremio format
-      const metas: StremioMeta[] = shows.map((item: CatalogItem) => {
-    const show = item.show;
-    let poster = null;
-    
-    if (show.images?.poster) {
-      if (Array.isArray(show.images.poster) && show.images.poster.length > 0) {
-        poster = show.images.poster[0];
-      } else if (!Array.isArray(show.images.poster) && typeof show.images.poster === 'object' && show.images.poster.thumb) {
-        poster = show.images.poster.thumb;
-      } else if (typeof show.images.poster === 'string') {
-        poster = show.images.poster;
-      }
-    }
-
-    // Ensure protocol
-    if (poster && !poster.startsWith('http')) {
-      poster = `https://${poster}`;
-    }
-
-    // RPDB Override
-    if (rpdbKey && rpdbKey !== 'disabled' && show.ids) {
-      // Log first poster for debugging
-      if (metas.length === 0) {
-        logger.debug(`Generating RPDB poster with key: ${rpdbKey}`);
-      }
-
-      if (show.ids.imdb) {
-        poster = `https://api.ratingposterdb.com/${rpdbKey}/imdb/poster-default/${show.ids.imdb}.jpg`;
-      } else if (show.ids.tmdb) {
-        poster = `https://api.ratingposterdb.com/${rpdbKey}/tmdb/poster-default/${show.ids.tmdb}.jpg`;
-      } else if (show.ids.tvdb) {
-        poster = `https://api.ratingposterdb.com/${rpdbKey}/tvdb/poster-default/${show.ids.tvdb}.jpg`;
-      }
-    }
-
-    const description = catalogId === 'binge_ready'
-      ? `Season ${item.latestSeason} is ready to binge! (${item.totalEpisodes} episodes)`
-      : `${(item.totalEpisodes || 0) - item.watchedEpisodes} episodes left to watch. Last watched: ${new Date(item.releaseDate || 0).toLocaleDateString('de-DE')}`;
-
-    return {
-      id: show.ids.imdb || `tt${show.ids.tmdb}` || `trakt:${show.ids.trakt}`,
-      type: 'series',
-      name: show.title,
-      poster: poster,
-      description: description,
-      releaseInfo: `${item.latestSeason}`,
-    };
-  });
+  const origin = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
+  const metas: StremioMeta[] = shows.map((item: CatalogItem) => (
+    mapTraktItemToMeta(item, 'series', rpdbKey, origin, catalogId, true)
+  ));
 
   // UX Improvement: If we have no shows and no cache (first run), show a "Scanning" placeholder
   if (metas.length === 0 && !cached) {
