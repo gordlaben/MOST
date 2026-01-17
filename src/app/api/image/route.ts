@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
-import path from 'path';
-import { cacheImage, getImagePathIfCached } from '@/lib/images';
+import { cacheImage, getImageMetaIfCached } from '@/lib/images';
 
 // Helper to convert Node stream to Web stream
 function nodeStreamToWeb(nodeStream: fs.ReadStream): ReadableStream {
@@ -28,20 +27,49 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Check if we have it locally
-    const existingPath = await getImagePathIfCached(url);
+    const cachedMeta = await getImageMetaIfCached(url);
 
-    if (existingPath) {
+    if (cachedMeta) {
+        const ifNoneMatch = request.headers.get('if-none-match');
+        const ifModifiedSince = request.headers.get('if-modified-since');
+
+        if (ifNoneMatch && ifNoneMatch === cachedMeta.etag) {
+          return new NextResponse(null, {
+            status: 304,
+            headers: {
+              'ETag': cachedMeta.etag,
+              'Last-Modified': cachedMeta.lastModified,
+              'Cache-Control': 'public, max-age=31536000, immutable',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        if (ifModifiedSince) {
+          const sinceTime = Date.parse(ifModifiedSince);
+          if (!Number.isNaN(sinceTime) && sinceTime >= cachedMeta.mtimeMs) {
+            return new NextResponse(null, {
+              status: 304,
+              headers: {
+                'ETag': cachedMeta.etag,
+                'Last-Modified': cachedMeta.lastModified,
+                'Cache-Control': 'public, max-age=31536000, immutable',
+                'Access-Control-Allow-Origin': '*'
+              }
+            });
+          }
+        }
+
         // Serve local file using stream to save memory
-        const stream = fs.createReadStream(existingPath);
+        const stream = fs.createReadStream(cachedMeta.filePath);
         const webStream = nodeStreamToWeb(stream);
-        
-        const ext = path.extname(existingPath);
-        const contentType = ext === '.png' ? 'image/png' : 'image/jpeg'; // naive but works
         
         return new NextResponse(webStream as unknown as BodyInit, {
           headers: {
-            'Content-Type': contentType,
+            'Content-Type': cachedMeta.contentType,
             'Cache-Control': 'public, max-age=31536000, immutable',
+            'ETag': cachedMeta.etag,
+            'Last-Modified': cachedMeta.lastModified,
             'Access-Control-Allow-Origin': '*',
           },
         });

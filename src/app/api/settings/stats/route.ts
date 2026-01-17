@@ -26,9 +26,8 @@ export async function GET(request: Request) {
     }
   });
 
-  let totalItems = 0;
-  let movies = 0;
-  let shows = 0;
+  const showIds = new Set<string>();
+  const movieIds = new Set<string>();
   let oldestUpdate: Date | null = null;
 
   for (const entry of cacheEntries) {
@@ -38,14 +37,19 @@ export async function GET(request: Request) {
 
       const items: CatalogItem[] = JSON.parse(entry.data);
       if (Array.isArray(items)) {
-        totalItems += items.length;
-        
         items.forEach(item => {
-           if (('show' in item && item.show) || ('season' in item)) {
-               shows++;
-           } else if ('movie' in item && item.movie) {
-               movies++;
-           }
+          // Normalized list items keep everything in `show` but have a `type`
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const content = (item as any).show || (item as any).movie || item;
+          const ids = content?.ids;
+
+          if (content?.type === 'movie' || ('movie' in item && (item as any).movie)) {
+            const movieKey = ids?.trakt ? `trakt:${ids.trakt}` : (ids?.imdb ? `imdb:${ids.imdb}` : (ids?.tmdb ? `tmdb:${ids.tmdb}` : null));
+            if (movieKey) movieIds.add(movieKey);
+          } else if (content?.type === 'show' || ('show' in item && (item as any).show)) {
+            const showKey = ids?.trakt ? `trakt:${ids.trakt}` : (ids?.imdb ? `imdb:${ids.imdb}` : (ids?.tmdb ? `tmdb:${ids.tmdb}` : null));
+            if (showKey) showIds.add(showKey);
+          }
         });
       }
 
@@ -68,9 +72,9 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    totalItems,
-    movies,
-    shows,
+    totalItems: showIds.size + movieIds.size,
+    movies: movieIds.size,
+    shows: showIds.size,
     lastSync: oldestUpdate ? oldestUpdate.toISOString() : null,
     nextSync: nextSync ? nextSync.toISOString() : null
   });
