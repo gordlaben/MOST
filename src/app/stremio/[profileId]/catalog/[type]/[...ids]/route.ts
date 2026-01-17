@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { prefetchImages } from '@/lib/images';
 import { mapTraktItemToMeta, StremioMeta } from '@/lib/stremio';
+import { aiSearch } from '@/lib/ai-search';
 
 // In-memory lock to prevent concurrent refreshes
 const refreshLocks: Record<string, boolean> = {};
@@ -205,7 +206,11 @@ export async function GET(
             accessToken
         );
 
-        const searchResults = await trakt.search(query, type === 'series' ? 'show' : 'movie');
+        const ai = await aiSearch(query, trakt, profileId, type === 'series' ? 'show' : 'movie');
+        let searchResults = ai.results;
+        if (!searchResults || searchResults.length === 0) {
+          searchResults = await trakt.search(query, type === 'series' ? 'show' : 'movie');
+        }
         
         // Get RPDB Key if available
         let rpdbKey = 't0-free-rpdb';

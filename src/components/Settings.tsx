@@ -12,6 +12,7 @@ interface SettingsProps {
 export default function Settings({ profileId: propProfileId }: SettingsProps) {
   const [clientId, setClientId] = useState('');
   const [rpdbKey, setRpdbKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
   const [dateFormat, setDateFormat] = useState<DateFormat>('mdy');
   const [lists, setLists] = useState<DashboardList[]>([]);
   const [overwriteExisting, setOverwriteExisting] = useState(false);
@@ -72,6 +73,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
       .then((data) => {
         setClientId(data.clientId || '');
         setRpdbKey(data.rpdbKey === 't0-free-rpdb' ? '' : data.rpdbKey || '');
+        setGeminiKey(data.geminiKey || '');
         setLists(data.selectedLists || []);
         setDateFormat(data.filters?.dateFormat || 'mdy');
         setLoading(false);
@@ -161,6 +163,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         body: JSON.stringify({ 
           profileId, // Pass profileId to save to specific profile
           rpdbKey,
+          geminiKey,
           selectedLists: listsToSave,
           DATE_FORMAT: dateFormat
         }),
@@ -500,6 +503,26 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               Leave empty to use the free tier. Set to &quot;disabled&quot; to use standard Trakt posters.
               <br />
               Get a key at <a href="https://ratingposterdb.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ratingposterdb.com</a> for more features.
+            </p>
+          </div>
+
+          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <h2 className="text-xl font-bold mb-4 text-purple-400">AI Search (Gemini)</h2>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Gemini API Key
+            </label>
+            <input
+              type="password"
+              value={geminiKey}
+              onChange={(e) => setGeminiKey(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+              placeholder="Enter your Gemini API Key"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Used for semantic search (e.g., “Best 90s movies”). Leave empty to disable AI search.
+            </p>
+            <p className={`text-xs mt-2 ${geminiKey ? 'text-green-400' : 'text-gray-500'}`}>
+              AI search is {geminiKey ? 'enabled' : 'disabled'}.
             </p>
           </div>
 

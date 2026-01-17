@@ -9,6 +9,7 @@ export async function GET(request: Request) {
   const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
   
   let rpdbKey = (await getSetting('RPDB_API_KEY')) || 't0-free-rpdb';
+  let geminiKey = (await getSetting('GEMINI_API_KEY')) || '';
   let includeEnded = (await getSetting('FILTER_INCLUDE_ENDED')) !== 'false';
   let includeCanceled = (await getSetting('FILTER_INCLUDE_CANCELED')) !== 'false';
   let includeReturning = (await getSetting('FILTER_INCLUDE_RETURNING')) !== 'false';
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
     const profile = await prisma.profile.findUnique({ where: { id: profileId } });
     if (profile) {
       if (profile.rpdbKey) rpdbKey = profile.rpdbKey;
+      if (profile.geminiKey) geminiKey = profile.geminiKey;
       if (profile.filters) {
         const filters = JSON.parse(profile.filters);
         includeEnded = filters.includeEnded;
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
     isConnected: !!accessToken,
     hasCredentials: !!(clientId && clientSecret),
     rpdbKey,
+    geminiKey,
     filters: {
       includeEnded,
       includeCanceled,
@@ -64,7 +67,8 @@ export async function POST(request: Request) {
   const body = await request.json();
   const { 
       profileId, 
-      rpdbKey, 
+      rpdbKey,
+      geminiKey,
       filters, 
       selectedLists, 
       FILTER_INCLUDE_ENDED, 
@@ -85,8 +89,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    const updateData: { rpdbKey?: string; selectedLists?: string; filters?: string } = {};
+    const updateData: { rpdbKey?: string; geminiKey?: string; selectedLists?: string; filters?: string } = {};
     if (rpdbKey !== undefined) updateData.rpdbKey = rpdbKey;
+    if (geminiKey !== undefined) updateData.geminiKey = geminiKey;
     if (selectedLists !== undefined) updateData.selectedLists = JSON.stringify(selectedLists);
 
     // Merge filters
@@ -126,6 +131,7 @@ export async function POST(request: Request) {
   } else {
     // Update Global Settings
     if (rpdbKey !== undefined) await setSetting('RPDB_API_KEY', rpdbKey);
+    if (geminiKey !== undefined) await setSetting('GEMINI_API_KEY', geminiKey);
 
     // Handle nested filters object
     if (filters) {

@@ -4,6 +4,7 @@ import { TraktClient } from '@/lib/trakt';
 import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
+import { aiSearch } from '@/lib/ai-search';
 
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/trakt/search');
@@ -54,20 +55,17 @@ export async function GET(request: NextRequest) {
       accessToken
     );
 
-    // Search both movies and shows
-    const [movieResults, showResults] = await Promise.all([
+    const ai = await aiSearch(query, trakt, profileId || undefined);
+    let results = ai.results;
+
+    if (!results || results.length === 0) {
+      // Search both movies and shows (fallback)
+      const [movieResults, showResults] = await Promise.all([
         trakt.search(query, 'movie'),
         trakt.search(query, 'show')
-    ]);
-
-    // Combine and sort by score or popularity if available, but Trakt usually returns sorted results.
-    // We'll just interleave or concat. Let's concat for now.
-    // The previous implementation might have just searched both.
-    // Actually the TraktClient.search returns any[];
-    
-    // Let's just return them. The client side can handle display.
-    // We'll combine them. 
-    const results = [...(movieResults || []), ...(showResults || [])];
+      ]);
+      results = [...(movieResults || []), ...(showResults || [])];
+    }
 
     const response = NextResponse.json({ results });
     timing.appendTo(response, 'trakt_search');
