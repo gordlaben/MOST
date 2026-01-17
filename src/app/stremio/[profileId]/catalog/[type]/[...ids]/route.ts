@@ -219,8 +219,8 @@ export async function GET(
             rpdbKey = profile.rpdbKey;
         }
 
-        const metas = searchResults.map((item: CatalogItem) => 
-          mapTraktItemToMeta(item, type, rpdbKey, origin, undefined, false, profileId)
+        const metas = searchResults.map((item) => 
+          mapTraktItemToMeta(item as unknown as CatalogItem, type, rpdbKey, origin, undefined, false, profileId)
         );
 
         return NextResponse.json({ metas }, {
