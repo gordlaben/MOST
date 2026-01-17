@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const includeEnded = searchParams.get('includeEnded') !== 'false';
   const includeCanceled = searchParams.get('includeCanceled') !== 'false';
   const includeReturning = searchParams.get('includeReturning') !== 'false';
-  const sortBy = (searchParams.get('sortBy') as 'newest' | 'oldest' | 'title') || 'newest';
+  const sortBy = (searchParams.get('sortBy') as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random') || 'newest';
   const profileId = searchParams.get('profileId') || undefined;
 
   const filters = { includeEnded, includeCanceled, includeReturning, sortBy };

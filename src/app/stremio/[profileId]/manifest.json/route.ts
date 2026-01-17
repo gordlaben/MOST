@@ -57,7 +57,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
 
   const sortExtra = {
       name: "sort",
-      options: ["newest", "oldest", "title", "title_z_a", "random"],
+      options: ["newest", "oldest", "title", "title_z_a", "rating_desc", "rating_asc", "random"],
       isRequired: false
   };
 

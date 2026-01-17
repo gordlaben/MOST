@@ -526,7 +526,7 @@ export class TraktClient {
     username?: string, 
     forceRefresh = false, 
     limit?: number, 
-    sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random',
+    sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random',
     filters?: { includeEnded: boolean; includeCanceled: boolean; includeReturning: boolean; type?: 'movie' | 'show' }
   ) {
     logger.debug(`Fetching items for list ${listId} (user: ${username || 'me'})${limit ? ` limit=${limit}` : ''} sortBy=${sortBy} filters=${JSON.stringify(filters)}`);
@@ -809,7 +809,7 @@ export class TraktClient {
 
   // Helper to sort list items
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random') {
+    private sortListItems(items: any[], sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random') {
       if (!Array.isArray(items)) return items;
       if (!sortBy) return items; // Return original order (Rank/Added)
 
@@ -820,6 +820,16 @@ export class TraktClient {
           [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
         }
         return shuffled;
+      }
+
+      if (sortBy === 'rating_desc' || sortBy === 'rating_asc') {
+        return [...items].sort((a, b) => {
+          const aContent = a.show || a.movie || a;
+          const bContent = b.show || b.movie || b;
+          const aRating = typeof aContent?.rating === 'number' ? aContent.rating : 0;
+          const bRating = typeof bContent?.rating === 'number' ? bContent.rating : 0;
+          return sortBy === 'rating_desc' ? bRating - aRating : aRating - bRating;
+        });
       }
 
       // Log first item to debug sorting
@@ -1442,7 +1452,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
       forceRefresh?: boolean;
     }
   ): Promise<TraktBingeReadyShow[]> {
@@ -1538,6 +1548,10 @@ export class TraktClient {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
     } else if (sortBy === 'title_z_a') {
       results.sort((a, b) => b.show.title.localeCompare(a.show.title));
+    } else if (sortBy === 'rating_desc') {
+      results.sort((a, b) => (b.show.rating || 0) - (a.show.rating || 0));
+    } else if (sortBy === 'rating_asc') {
+      results.sort((a, b) => (a.show.rating || 0) - (b.show.rating || 0));
     } else if (sortBy === 'oldest') {
       results.sort((a, b) => new Date(a.releaseDate).getTime() - new Date(b.releaseDate).getTime());
     } else {
@@ -1554,7 +1568,7 @@ export class TraktClient {
       includeEnded?: boolean;
       includeCanceled?: boolean;
       includeReturning?: boolean;
-      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+      sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
       forceRefresh?: boolean;
     }
   ): Promise<TraktEpisodeLeftShow[]> {
@@ -1672,6 +1686,10 @@ export class TraktClient {
       results.sort((a, b) => a.show.title.localeCompare(b.show.title));
     } else if (sortBy === 'title_z_a') {
       results.sort((a, b) => b.show.title.localeCompare(a.show.title));
+    } else if (sortBy === 'rating_desc') {
+      results.sort((a, b) => (b.show.rating || 0) - (a.show.rating || 0));
+    } else if (sortBy === 'rating_asc') {
+      results.sort((a, b) => (a.show.rating || 0) - (b.show.rating || 0));
     } else if (sortBy === 'oldest') {
       // For episodes left, "oldest" might mean "oldest last watched" or "oldest release date"
       // Let's stick to last watched for now as it's relevant for "continue watching"

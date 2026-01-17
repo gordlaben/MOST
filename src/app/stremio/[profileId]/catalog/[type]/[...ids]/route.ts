@@ -13,7 +13,7 @@ interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
   forceRefresh?: boolean;
 }
 
@@ -254,7 +254,7 @@ export async function GET(
         
         // Override sortBy with per-list preference
            if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
-             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
         }
       }
       if (profile.rpdbKey) {
@@ -283,7 +283,7 @@ export async function GET(
     if (sortParam) {
       const val = sortParam.replace('sort=', '').replace('.json', '');
       if (val === 'newest' || val === 'oldest' || val === 'title' || val === 'title_z_a' || val === 'random') {
-        filters.sortBy = val as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+        filters.sortBy = val as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
       }
     }
   }

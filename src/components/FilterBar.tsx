@@ -122,6 +122,8 @@ export default function FilterBar({
             <option value="oldest">Oldest Release Date</option>
             <option value="title">Title (A-Z)</option>
             <option value="title_z_a">Title (Z-A)</option>
+            <option value="rating_desc">Rating (10-1)</option>
+            <option value="rating_asc">Rating (1-10)</option>
             <option value="random">Random</option>
           </select>
           <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">

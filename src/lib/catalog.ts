@@ -9,7 +9,7 @@ export interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
   forceRefresh?: boolean;
 }
 
