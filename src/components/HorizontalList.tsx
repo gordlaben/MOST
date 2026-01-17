@@ -23,6 +23,7 @@ export interface HorizontalListProps {
     onRemoveHistory: (slug: string, title: string, isMovie: boolean) => void;
     onSelectList: (list: DashboardList) => void;
     onRenameList?: (listId: string, newName: string) => void;
+    headerActions?: React.ReactNode;
     onToggleVisibility?: (listId: string) => void;
     onRemoveList?: (listId: string) => void;
     dragHandle?: React.ReactNode;
@@ -49,6 +50,7 @@ const HorizontalList = memo(function HorizontalList({
     onRemoveHistory,
     onSelectList,
     onRenameList,
+    headerActions,
     onToggleVisibility,
     onRemoveList,
     dragHandle,
@@ -169,14 +171,7 @@ const HorizontalList = memo(function HorizontalList({
         const { ref: inViewRef, inView } = useInView({ triggerOnce: true, rootMargin: '100px' });
 
         useEffect(() => {
-            if (listItems) {
-                setItems(listItems);
-                cacheRef.current[cacheKey] = listItems;
-                setLoading(false);
-                return;
-            }
-
-            if (!inView) return;
+            if (!inView || listItems) return;
 
             const cached = cacheRef.current[cacheKey];
             if (cached && cached.length > 0) {
@@ -216,9 +211,16 @@ const HorizontalList = memo(function HorizontalList({
             if (profileId) {
                 fetchItems();
             }
-        }, [list, listItems, profileId, version, sortBy, filters, inView, cacheKey, type]);
+        }, [profileId, version, sortBy, filters, inView, cacheKey, type, listItems]);
 
-        const isLoading = listLoading ?? loading;
+        useEffect(() => {
+            if (listItems && listItems.length > 0) {
+                cacheRef.current[cacheKey] = listItems;
+            }
+        }, [listItems, cacheKey]);
+
+        const isLoading = listLoading ?? (listItems ? false : loading);
+        const effectiveItems = listItems ?? items;
 
         const data: RowItem[] = useMemo(() => {
             const rows: RowItem[] = [];
@@ -227,13 +229,13 @@ const HorizontalList = memo(function HorizontalList({
                 rows.push({ kind: 'placeholder', list });
             }
 
-            if (isLoading && items.length === 0) {
+            if (isLoading && effectiveItems.length === 0) {
                 for (let i = 0; i < 8; i++) {
                     rows.push({ kind: 'skeleton', id: `s-${i}` });
                 }
             }
 
-            items.forEach((item, idx) => {
+            effectiveItems.forEach((item, idx) => {
                 const traktId = 'show' in item && item.show
                     ? item.show.ids.trakt
                     : ('movie' in item && item.movie ? item.movie.ids.trakt : idx);
@@ -431,6 +433,7 @@ const HorizontalList = memo(function HorizontalList({
                                 <div className="w-max">{BadgeGroup}</div>
                             </div>
                             <div className="flex items-center gap-3 ml-auto sm:ml-4 shrink-0 pl-2 border-l border-white/10 sm:border-none">
+                                {headerActions}
                                 {(list.type === 'custom' || list.type === 'ai') && onRemoveList && (
                                     <button
                                         onClick={() => onRemoveList(list.id)}
