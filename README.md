@@ -91,6 +91,10 @@ services:
       # Optional: Pre-configure Trakt (can also be done in UI)
       - TRAKT_CLIENT_ID=your_client_id
       - TRAKT_CLIENT_SECRET=your_client_secret
+
+      # Optional: Gemini AI semantic search
+      - GEMINI_API_KEY=your_gemini_key
+      - GEMINI_MODEL=gemini-flash-latest
       
       # Required: Your public URL for Stremio/Calendar links
       - NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -133,8 +137,8 @@ docker-compose up -d
 
 3.  **Setup Environment**
     ```bash
-    cp .env.local.example .env.local
-    # Edit .env.local with your database URL and Trakt keys
+    cp .env.example .env
+    # Edit .env with your database URL and keys
     ```
 
 4.  **Initialize Database**
@@ -162,6 +166,8 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 | `APP_URL` | Used internally to construct absolute URLs (e.g. for Stremio manifests) and fix image proxy redirects. | `http://localhost:3000` |
 | `TRAKT_CLIENT_ID` | Your Trakt.tv Application Client ID. | - |
 | `TRAKT_CLIENT_SECRET` | Your Trakt.tv Application Client Secret. | - |
+| `GEMINI_API_KEY` | (Optional) Gemini API key for semantic search. | - |
+| `GEMINI_MODEL` | (Optional) Gemini model to use. | `gemini-flash-latest` |
 | `ADMIN_PASSWORD` | (Optional) Password for accessing the `/admin` dashboard to manage users. | - |
 | `ENABLE_REGISTRATION` | Set to `false` to disable the "Create Profile" form. Useful for private instances. | `true` |
 
