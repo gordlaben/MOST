@@ -497,30 +497,26 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             {/* Cache Stats */}
             <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
               <h2 className="text-xl font-bold mb-4 text-purple-400">Cached Posters</h2>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cached Posters</div>
-                  <div className="text-2xl font-bold text-white">{cacheStats?.totalCount ?? 0}</div>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider min-h-[28px] flex items-center justify-center">Cached Posters</div>
+                  <div className="text-2xl font-bold text-white leading-none">{cacheStats?.totalCount ?? 0}</div>
                 </div>
                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Size</div>
-                  <div className="text-2xl font-bold text-white">{formatBytes(cacheStats?.totalBytes ?? 0)}</div>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider min-h-[28px] flex items-center justify-center">Cache Size</div>
+                  <div className="text-2xl font-bold text-white leading-none">{formatBytes(cacheStats?.totalBytes ?? 0)}</div>
                 </div>
                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Posters</div>
-                  <div className="text-2xl font-bold text-red-400">{cacheStats?.unusedCount ?? 0}</div>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider min-h-[28px] flex items-center justify-center">Unused Posters</div>
+                  <div className="text-2xl font-bold text-red-400 leading-none">{cacheStats?.unusedCount ?? 0}</div>
                 </div>
                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Size</div>
-                  <div className="text-2xl font-bold text-red-400">{formatBytes(cacheStats?.unusedBytes ?? 0)}</div>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider min-h-[28px] flex items-center justify-center">Unused Size</div>
+                  <div className="text-2xl font-bold text-red-400 leading-none">{formatBytes(cacheStats?.unusedBytes ?? 0)}</div>
                 </div>
                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Missing Posters</div>
-                  <div className="text-2xl font-bold text-yellow-300">{cacheStats?.missingCount ?? 0}</div>
-                </div>
-                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
-                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Errors</div>
-                  <div className="text-2xl font-bold text-yellow-300">{cacheStats?.errorCount ?? 0}</div>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider min-h-[28px] flex items-center justify-center">Cache Errors</div>
+                  <div className="text-2xl font-bold text-yellow-300 leading-none">{cacheStats?.errorCount ?? 0}</div>
                 </div>
               </div>
 

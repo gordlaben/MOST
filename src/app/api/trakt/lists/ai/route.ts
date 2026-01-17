@@ -23,7 +23,8 @@ export async function POST(request: NextRequest) {
       prompt: z.string().min(3),
       type: z.enum(['movie', 'show']),
       size: z.number().int().min(1).max(100).optional(),
-      privacy: z.enum(['private', 'friends', 'public']).optional()
+      privacy: z.enum(['private', 'friends', 'public']).optional(),
+      name: z.string().min(1).optional()
     });
 
     const parsedBody = bodySchema.safeParse(body);
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const { profileId, prompt, type, size, privacy } = parsedBody.data;
+    const { profileId, prompt, type, size, privacy, name } = parsedBody.data;
 
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
     if (!accessToken) {
@@ -47,12 +48,16 @@ export async function POST(request: NextRequest) {
     const trakt = new TraktClient(clientId || '', clientSecret || '', '', accessToken);
 
     const listSize = clampSize(size || 20);
-    const nameResult = await aiSuggestListName(prompt, profileId, type, listSize);
-    if (!nameResult.usedAI || !nameResult.name) {
-      const response = NextResponse.json({ error: 'AI is not configured for list creation' }, { status: 400 });
-      timing.appendTo(response, 'trakt_ai_list');
-      ctx.end(response.status);
-      return response;
+    let listName = name?.trim();
+    if (!listName) {
+      const nameResult = await aiSuggestListName(prompt, profileId, type, listSize);
+      if (!nameResult.usedAI || !nameResult.name) {
+        const response = NextResponse.json({ error: 'AI is not configured for list creation' }, { status: 400 });
+        timing.appendTo(response, 'trakt_ai_list');
+        ctx.end(response.status);
+        return response;
+      }
+      listName = nameResult.name;
     }
 
     const ai = await aiSearch(prompt, trakt, profileId, type, listSize);
@@ -79,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const description = `AI Made · ${prompt}`;
-    const list = await trakt.createList(nameResult.name, description, privacy || 'private');
+    const list = await trakt.createList(listName, description, privacy || 'private');
 
     if (type === 'movie') {
       await trakt.addItemsToList(list.ids.slug, { movies: items });
