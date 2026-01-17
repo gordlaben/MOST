@@ -808,15 +808,40 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     });
   };
 
-  const renameList = (listId: string, newName: string) => {
-    const newLists = selectedLists.map(l => {
-      if (l.id === listId) {
-        return { ...l, name: newName };
+  const renameList = async (listId: string, newName: string) => {
+    if (!profileId) return;
+    const list = selectedLists.find(l => l.id === listId);
+    if (!list || list.type === 'system') return;
+
+    setLoadingLists(true);
+    try {
+      const res = await fetch(`/api/trakt/lists/${listId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, name: newName })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        addToast(err.error || 'Failed to rename list', 'error');
+        return;
       }
-      return l;
-    });
-    setSelectedLists(newLists);
-    saveLists(newLists);
+
+      const newLists = selectedLists.map(l => {
+        if (l.id === listId) {
+          return { ...l, name: newName };
+        }
+        return l;
+      });
+      setSelectedLists(newLists);
+      saveLists(newLists);
+      addToast('List renamed successfully', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to rename list', 'error');
+    } finally {
+      setLoadingLists(false);
+    }
   };
 
   const updateList = (updatedList: DashboardList) => {

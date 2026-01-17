@@ -386,6 +386,25 @@ export class TraktClient {
     }
   }
 
+  async updateList(listId: string, name: string, description = '', privacy = 'private') {
+    logger.debug(`Updating list: ${listId}`);
+    try {
+      const response = await this.request<TraktList>('put', `${TRAKT_API_URL}/users/me/lists/${listId}`, {
+        name,
+        description,
+        privacy,
+        display_numbers: false,
+        allow_comments: true,
+        sort_by: 'added',
+        sort_how: 'asc'
+      });
+      return response;
+    } catch (error) {
+      logger.error('Failed to update list', error);
+      throw error;
+    }
+  }
+
   async addItemsToList(listId: string, items: { movies?: { ids: { slug: string } }[], shows?: { ids: { slug: string } }[] }) {
     logger.debug(`Adding items to list ${listId}`);
     try {

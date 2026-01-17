@@ -213,6 +213,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
     listItems,
     importList,
     removeList,
+    renameList,
     updateList,
     refreshList,
     createList,
@@ -1111,6 +1112,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                                 homeScrollY.current = window.scrollY;
                                                 selectList(list);
                                             }}
+                                            onRenameList={renameList}
                                             onToggleVisibility={toggleListVisibility}
                                             onRemoveList={removeList}
                                             compactMode={compactMode}

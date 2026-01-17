@@ -22,6 +22,7 @@ export interface HorizontalListProps {
     onMarkWatched: (slug: string, season: number | undefined, title: string, isMovie: boolean) => void;
     onRemoveHistory: (slug: string, title: string, isMovie: boolean) => void;
     onSelectList: (list: DashboardList) => void;
+    onRenameList?: (listId: string, newName: string) => void;
     onToggleVisibility?: (listId: string) => void;
     onRemoveList?: (listId: string) => void;
     dragHandle?: React.ReactNode;
@@ -47,6 +48,7 @@ const HorizontalList = memo(function HorizontalList({
     onMarkWatched,
     onRemoveHistory,
     onSelectList,
+    onRenameList,
     onToggleVisibility,
     onRemoveList,
     dragHandle,
@@ -329,6 +331,22 @@ const HorizontalList = memo(function HorizontalList({
                                     onClick={() => onSelectList(list)}
                                 >
                                     {list.name}
+                                    {onRenameList && list.type !== 'system' && list.id !== 'watchlist' && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const nextName = window.prompt('Rename list', list.name);
+                                                if (nextName && nextName.trim() && nextName.trim() !== list.name) {
+                                                    onRenameList(list.id, nextName.trim());
+                                                }
+                                            }}
+                                            className="text-gray-500 hover:text-purple-300 transition-colors"
+                                            title="Rename list"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                        </button>
+                                    )}
                                     {isHidden && (
                                         <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border bg-gray-700 text-gray-400 border-gray-600">Hidden</span>
                                     )}
