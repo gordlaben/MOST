@@ -187,11 +187,18 @@ export async function GET(
   // Handle Search
   if (ids[0] === 'most_search' || ids[0] === 'most_search.json') {
       const searchParam = ids.find(p => p.startsWith('search='));
-      if (!searchParam) {
-          return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+      const urlSearch = request.nextUrl.searchParams.get('search');
+      if (!searchParam && !urlSearch) {
+        return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
       }
 
-      const query = decodeURIComponent(searchParam.replace('search=', '').replace('.json', ''));
+      const query = decodeURIComponent(
+        (searchParam ? searchParam.replace('search=', '').replace('.json', '') : urlSearch || '').trim()
+      );
+
+      if (!query) {
+        return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+      }
       
       try {
         const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
