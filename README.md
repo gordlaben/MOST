@@ -55,6 +55,10 @@ It also helps you wait. Instead of checking every week for new episodes, the "Bi
 *   **👥 Multi-User**: Supports multiple profiles, so everyone in the house can use their own Trakt account.
 *   **📅 Calendar Feed**: Generates a personal `.ics` link for your calendar apps so you know when a binge is coming up.
 *   **⚡ Local Caching**: Caches metadata and RPDB posters locally. Your lists load instantly because they aren't waiting for external APIs.
+*   **🤖 AI Search & Lists**: Semantic search powered by Gemini, plus one-click AI list creation from prompts or search results.
+*   **✍️ Inline List Renaming**: Rename lists directly in the UI and sync the new name to Trakt.
+*   **🧹 Cache Insights**: Visual cache stats with one-click cleanup for unused posters.
+*   **⚙️ Smart Settings**: Autosave settings with profile-specific AI model selection.
 *   **🛡️ Privacy**: Self-hosted. Your data stays on your server.
 
 ---
@@ -91,6 +95,10 @@ services:
       # Optional: Pre-configure Trakt (can also be done in UI)
       - TRAKT_CLIENT_ID=your_client_id
       - TRAKT_CLIENT_SECRET=your_client_secret
+
+      # Optional: Gemini AI semantic search
+      - GEMINI_API_KEY=your_gemini_key
+      - GEMINI_MODEL=gemini-flash-latest
       
       # Required: Your public URL for Stremio/Calendar links
       - NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -133,8 +141,8 @@ docker-compose up -d
 
 3.  **Setup Environment**
     ```bash
-    cp .env.local.example .env.local
-    # Edit .env.local with your database URL and Trakt keys
+    cp .env.example .env
+    # Edit .env with your database URL and keys
     ```
 
 4.  **Initialize Database**
@@ -162,6 +170,8 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 | `APP_URL` | Used internally to construct absolute URLs (e.g. for Stremio manifests) and fix image proxy redirects. | `http://localhost:3000` |
 | `TRAKT_CLIENT_ID` | Your Trakt.tv Application Client ID. | - |
 | `TRAKT_CLIENT_SECRET` | Your Trakt.tv Application Client Secret. | - |
+| `GEMINI_API_KEY` | (Optional) Gemini API key for semantic search. | - |
+| `GEMINI_MODEL` | (Optional) Gemini model to use. | `gemini-flash-latest` |
 | `ADMIN_PASSWORD` | (Optional) Password for accessing the `/admin` dashboard to manage users. | - |
 | `ENABLE_REGISTRATION` | Set to `false` to disable the "Create Profile" form. Useful for private instances. | `true` |
 

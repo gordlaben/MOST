@@ -59,7 +59,7 @@ export async function detectAndUpdateListTypes(profileId: string, lists: Selecte
                     continue;
                 }
 
-                 const listOwner = list.type === 'custom' ? list.owner : undefined;
+                 const listOwner = (list.type === 'custom' || list.type === 'ai') ? list.owner : undefined;
                  
                  // Fetch limiting to small amount to detect type efficiently? 
                  // We need to find at least one movie and one show.

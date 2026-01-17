@@ -29,7 +29,7 @@ export interface TraktListItem {
 export interface DashboardList {
     id: string;
     name: string;
-    type: 'system' | 'custom' | 'trakt';
+  type: 'system' | 'custom' | 'trakt' | 'ai';
     enabled: boolean;
     owner?: string;
     description?: string;
@@ -744,35 +744,150 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     }
   };
 
+  const createAiList = async (
+    prompt: string,
+    type: 'movie' | 'show',
+    size: number,
+    privacy: string,
+    nameOverride?: string
+  ) => {
+    if (!profileId) return false;
+
+    setLoadingLists(true);
+    try {
+      const res = await fetch('/api/trakt/lists/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, prompt, type, size, privacy, name: nameOverride })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const listData = data.list;
+        const newList = {
+          id: listData.ids.slug,
+          name: listData.name,
+          type: 'ai' as const,
+          enabled: true,
+          owner: 'me',
+          description: listData.description,
+          item_count: data.itemCount ?? listData.item_count ?? 0,
+          content_type: type === 'movie' ? 'movie' : 'series'
+        };
+
+        const newLists = [...selectedLists, newList];
+        setSelectedLists(newLists);
+        saveLists(newLists);
+        addToast(`Created AI list: ${listData.name}`, 'success');
+        return true;
+      } else {
+        const err = await res.json();
+        addToast(err.error || 'Failed to create AI list', 'error');
+        return false;
+      }
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to create AI list', 'error');
+      return false;
+    } finally {
+      setLoadingLists(false);
+    }
+  };
+
   const removeList = (listId: string) => {
     const list = selectedLists.find(l => l.id === listId);
     if (!list) return;
 
+    if (list.type === 'system') {
+      toggleListVisibility(listId);
+      addToast('List hidden', 'info');
+      return;
+    }
+
+    const isOwnedList = list.type === 'custom' || list.type === 'ai' || list.owner === 'me';
+    if (!isOwnedList) {
+      toggleListVisibility(listId);
+      addToast('List hidden (not owned on Trakt)', 'info');
+      return;
+    }
+
     setModalConfig({
         isOpen: true,
-        title: 'Remove List?',
-        message: `Are you sure you want to remove the list "${list.name}"? This will only remove it from Most, not Trakt.`,
-        confirmText: 'Remove',
+      title: 'Delete List?',
+      message: `Are you sure you want to delete the list "${list.name}" from Trakt? This will remove it from both Trakt and Most.`,
+      confirmText: 'Delete',
         confirmColor: 'red',
-        onConfirm: () => {
-            const newLists = selectedLists.filter(l => l.id !== listId);
-            setSelectedLists(newLists);
-            saveLists(newLists);
-            closeModal();
-            addToast('List removed successfully', 'success');
+      onConfirm: async () => {
+        setLoadingLists(true);
+        try {
+          const res = await fetch(`/api/trakt/lists/${listId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId })
+          });
+
+          if (!res.ok) {
+            if (res.status >= 400 && res.status < 500) {
+              const newLists = selectedLists.filter(l => l.id !== listId);
+              setSelectedLists(newLists);
+              saveLists(newLists);
+              addToast('List cannot be deleted on Trakt. Hidden instead.', 'info');
+              return;
+            }
+            const err = await res.json();
+            addToast(err.error || 'Failed to delete list', 'error');
+            return;
+          }
+
+          const newLists = selectedLists.filter(l => l.id !== listId);
+          setSelectedLists(newLists);
+          saveLists(newLists);
+          addToast('List deleted successfully', 'success');
+        } catch (e) {
+          console.error(e);
+          addToast('Failed to delete list', 'error');
+        } finally {
+          closeModal();
+          setLoadingLists(false);
         }
+      }
     });
   };
 
-  const renameList = (listId: string, newName: string) => {
-    const newLists = selectedLists.map(l => {
-      if (l.id === listId) {
-        return { ...l, name: newName };
+  const renameList = async (listId: string, newName: string) => {
+    if (!profileId) return;
+    const list = selectedLists.find(l => l.id === listId);
+    if (!list || list.type === 'system') return;
+
+    setLoadingLists(true);
+    try {
+      const res = await fetch(`/api/trakt/lists/${listId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, name: newName })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        addToast(err.error || 'Failed to rename list', 'error');
+        return;
       }
-      return l;
-    });
-    setSelectedLists(newLists);
-    saveLists(newLists);
+
+      const newLists = selectedLists.map(l => {
+        if (l.id === listId) {
+          return { ...l, name: newName };
+        }
+        return l;
+      });
+      setSelectedLists(newLists);
+      saveLists(newLists);
+      addToast('List renamed successfully', 'success');
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to rename list', 'error');
+    } finally {
+      setLoadingLists(false);
+    }
   };
 
   const updateList = (updatedList: DashboardList) => {
@@ -1197,6 +1312,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     renameList,
     updateList,
     createList,
+    createAiList,
     sortPreferences,
     hasLoadedBinge,
     hasLoadedEpisodes

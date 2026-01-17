@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   DndContext, 
   closestCenter,
@@ -213,9 +213,11 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
     listItems,
     importList,
     removeList,
+    renameList,
     updateList,
     refreshList,
     createList,
+    createAiList,
 
     listVersions,
     sortPreferences,
@@ -236,6 +238,13 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   const [searchMovies, setSearchMovies] = useState<SearchResult[]>([]);
   const [searchShows, setSearchShows] = useState<SearchResult[]>([]);
   const [isSearchingTrakt, setIsSearchingTrakt] = useState(false);
+
+  const getAiListSize = useCallback((count: number) => {
+    if (count >= 100) return 100;
+    if (count >= 50) return 50;
+    if (count >= 20) return 20;
+    return 10;
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
@@ -266,8 +275,14 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   const [importUrl, setImportUrl] = useState('');
   
   // Create List Logic
-  const [addListTab, setAddListTab] = useState<'import' | 'create'>('import');
+  const [addListTab, setAddListTab] = useState<'import' | 'create' | 'ai'>('import');
   const [createListForm, setCreateListForm] = useState({ name: '', description: '', privacy: 'private' });
+  const [createAiForm, setCreateAiForm] = useState({
+    prompt: '',
+    type: 'movie',
+    size: 20,
+    privacy: 'private'
+  });
 
   // Renaming Logic
 
@@ -334,11 +349,11 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   //     }
   // }, [view]);
 
-  useEffect(() => {
+    useEffect(() => {
       if (loadMoreListsInView && view === 'home') {
-          setVisibleListsCount(prev => prev + 3);
+        setVisibleListsCount(prev => (prev < visibleLists.length ? prev + 3 : prev));
       }
-  }, [loadMoreListsInView, view, visibleListsCount]); // Added visibleListsCount to dependency for infinite loop if still in view
+    }, [loadMoreListsInView, view, visibleLists.length]);
 
   const openPlaceholderModal = (listId: string) => {
     const list = selectedLists.find(l => l.id === listId);
@@ -1051,6 +1066,26 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                         onMarkWatched={markAsWatched}
                                         onRemoveHistory={removeFromHistory}
                                         onSelectList={() => {}} 
+                                        headerActions={(
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (searchQuery.trim().length > 2) {
+                                                createAiList(
+                                                  searchQuery.trim(),
+                                                  'movie',
+                                                  getAiListSize(searchMovies.length),
+                                                  'private',
+                                                  searchQuery.trim()
+                                                );
+                                              }
+                                            }}
+                                            disabled={loadingLists || searchQuery.trim().length < 3}
+                                            className="px-3 py-1.5 text-xs font-bold rounded-md bg-purple-600/80 hover:bg-purple-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            Create list
+                                          </button>
+                                        )}
                                         compactMode={compactMode}
                                         onItemClick={(item, posterUrl) => handleItemClick(item as unknown as TraktListItem, posterUrl)}
                                      />
@@ -1069,6 +1104,26 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                         onMarkWatched={markAsWatched}
                                         onRemoveHistory={removeFromHistory}
                                         onSelectList={() => {}} 
+                                        headerActions={(
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (searchQuery.trim().length > 2) {
+                                                createAiList(
+                                                  searchQuery.trim(),
+                                                  'show',
+                                                  getAiListSize(searchShows.length),
+                                                  'private',
+                                                  searchQuery.trim()
+                                                );
+                                              }
+                                            }}
+                                            disabled={loadingLists || searchQuery.trim().length < 3}
+                                            className="px-3 py-1.5 text-xs font-bold rounded-md bg-purple-600/80 hover:bg-purple-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            Create list
+                                          </button>
+                                        )}
                                         compactMode={compactMode}
                                         onItemClick={(item, posterUrl) => handleItemClick(item as unknown as TraktListItem, posterUrl)}
                                      />
@@ -1104,6 +1159,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                                 homeScrollY.current = window.scrollY;
                                                 selectList(list);
                                             }}
+                                            onRenameList={renameList}
                                             onToggleVisibility={toggleListVisibility}
                                             onRemoveList={removeList}
                                             compactMode={compactMode}
@@ -1213,6 +1269,12 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                     >
                                         Create New
                                     </button>
+                                  <button 
+                                    onClick={() => setAddListTab('ai')} 
+                                    className={`pb-2 px-4 font-bold transition-colors border-b-2 text-sm ${addListTab === 'ai' ? 'border-purple-500 text-purple-400' : 'border-transparent text-gray-400 hover:text-gray-200'}`}
+                                  >
+                                    Using AI
+                                  </button>
                                 </div>
                                 
                                 {addListTab === 'import' ? (
@@ -1261,7 +1323,7 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                             </div>
                                         </div>
                                     </>
-                                ) : (
+                                ) : addListTab === 'create' ? (
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-xs font-bold text-gray-400 uppercase mb-1">List Name</label>
@@ -1321,6 +1383,87 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                             </button>
                                         </div>
                                     </div>
+                                      ) : (
+                                        <div className="space-y-4">
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Prompt</label>
+                                            <textarea
+                                              value={createAiForm.prompt}
+                                              onChange={(e) => setCreateAiForm(prev => ({ ...prev, prompt: e.target.value }))}
+                                              placeholder="Best movies from the 90s"
+                                              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none h-24"
+                                              autoFocus
+                                            />
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Type</label>
+                                              <select
+                                                value={createAiForm.type}
+                                                onChange={(e) => setCreateAiForm(prev => ({ ...prev, type: e.target.value }))}
+                                                className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                                              >
+                                                <option value="movie">Movies</option>
+                                                <option value="show">Series</option>
+                                              </select>
+                                            </div>
+                                            <div>
+                                              <label className="block text-xs font-bold text-gray-400 uppercase mb-1">List Size</label>
+                                              <select
+                                                value={createAiForm.size}
+                                                onChange={(e) => setCreateAiForm(prev => ({ ...prev, size: Number(e.target.value) }))}
+                                                className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                                              >
+                                                <option value={10}>10</option>
+                                                <option value={20}>20</option>
+                                                <option value={50}>50</option>
+                                                <option value={100}>100</option>
+                                              </select>
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Privacy</label>
+                                            <select
+                                              value={createAiForm.privacy}
+                                              onChange={(e) => setCreateAiForm(prev => ({ ...prev, privacy: e.target.value }))}
+                                              className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                                            >
+                                              <option value="private">Private</option>
+                                              <option value="friends">Friends Only</option>
+                                              <option value="public">Public</option>
+                                            </select>
+                                          </div>
+
+                                          <div className="flex gap-3 justify-end pt-2">
+                                            <button 
+                                              onClick={() => setIsAddListModalOpen(false)}
+                                              className="px-4 py-2 text-gray-400 hover:text-white font-bold transition-colors"
+                                            >
+                                              Cancel
+                                            </button>
+                                            <button 
+                                              onClick={async () => {
+                                                if (createAiForm.prompt.trim().length > 2) {
+                                                  const success = await createAiList(
+                                                    createAiForm.prompt,
+                                                    createAiForm.type as 'movie' | 'show',
+                                                    createAiForm.size,
+                                                    createAiForm.privacy
+                                                  );
+                                                  if (success) {
+                                                    setCreateAiForm({ prompt: '', type: 'movie', size: 20, privacy: 'private' });
+                                                    setIsAddListModalOpen(false);
+                                                    setAddListTab('import');
+                                                  }
+                                                }
+                                              }}
+                                              disabled={loadingLists || createAiForm.prompt.trim().length < 3}
+                                              className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-900/20"
+                                            >
+                                              {loadingLists ? 'Creating...' : 'Create AI List'}
+                                            </button>
+                                          </div>
+                                        </div>
                                 )}
                             </div>
                         </div>

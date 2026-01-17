@@ -102,6 +102,7 @@ model Profile {
   traktRefreshToken String?
   traktExpiresAt    String?
   rpdbKey           String?
+  geminiKey         String?
   filters           String?  // JSON string
   selectedLists     String?  // JSON string: [{id: string, name: string, enabled: boolean, order: number}]
   manifestVersion   String?
