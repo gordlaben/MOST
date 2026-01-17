@@ -203,7 +203,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   };
   
   const handleExport = () => {
-    const customLists = lists.filter(l => l.type === 'custom');
+    const customLists = lists.filter(l => l.type === 'custom' || l.type === 'ai');
     if (customLists.length === 0) {
       setMessage('No custom lists to export.');
       return;
@@ -219,7 +219,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   };
 
   const handleCopyToClipboard = () => {
-    const customLists = lists.filter(l => l.type === 'custom');
+    const customLists = lists.filter(l => l.type === 'custom' || l.type === 'ai');
     if (customLists.length === 0) {
       setMessage('No custom lists to copy.');
       return;
@@ -244,7 +244,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
           if (event.target?.result) {
             const importedLists = JSON.parse(event.target.result as string);
             if (Array.isArray(importedLists)) {
-              const validImports = importedLists.filter(l => l.type === 'custom' && l.id && l.title);
+              const validImports = importedLists.filter(l => (l.type === 'custom' || l.type === 'ai') && l.id && l.title);
               
               let newLists = [...lists];
               let addedCount = 0;

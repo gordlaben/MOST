@@ -52,14 +52,16 @@ async function callGemini(
   query: string,
   apiKey: string,
   type?: 'movie' | 'show',
-  modelOverride?: string | null
+  modelOverride?: string | null,
+  limit = 20
 ): Promise<AISearchItem[]> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
   const model = genAI.getGenerativeModel({ model: modelName });
 
+  const clampedLimit = Math.max(1, Math.min(100, limit));
   const typeLine = type ? `Only return items of type '${type}'.` : 'Return both movies and shows only if clearly relevant.';
-  const prompt = `You are a media search assistant. Convert the user query into a JSON array of up to 20 items with fields: type ('movie'|'show'), title, year (optional).
+  const prompt = `You are a media search assistant. Convert the user query into a JSON array of up to ${clampedLimit} items with fields: type ('movie'|'show'), title, year (optional).
 ${typeLine}
 Return ONLY valid JSON. No markdown.
 Query: ${query}`;
@@ -72,10 +74,54 @@ Query: ${query}`;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => item && (item.type === 'movie' || item.type === 'show') && typeof item.title === 'string')
-      .slice(0, 20);
+      .slice(0, clampedLimit);
   } catch (e) {
     logger.warn('Gemini returned non-JSON response', e);
     return [];
+  }
+}
+
+async function callGeminiListName(
+  prompt: string,
+  apiKey: string,
+  modelOverride?: string | null,
+  type?: 'movie' | 'show',
+  size?: number
+): Promise<string | null> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
+  const model = genAI.getGenerativeModel({ model: modelName });
+
+  const typeLabel = type ? (type === 'movie' ? 'movies' : 'series') : 'titles';
+  const sizeLabel = size ? `${size} ${typeLabel}` : typeLabel;
+  const namePrompt = `Create a short, catchy list name (max 60 characters) for a list of ${sizeLabel}.
+Base it on this prompt: ${prompt}
+Return ONLY the name as plain text. No quotes, no markdown.`;
+
+  const result = await model.generateContent(namePrompt);
+  const text = result.response.text().trim();
+  if (!text) return null;
+  return text.replace(/^"|"$/g, '').trim().slice(0, 60);
+}
+
+export async function aiSuggestListName(
+  prompt: string,
+  profileId?: string,
+  type?: 'movie' | 'show',
+  size?: number
+) {
+  const apiKey = await getGeminiKey(profileId);
+  if (!apiKey) {
+    return { name: null, usedAI: false };
+  }
+
+  try {
+    const model = await getGeminiModel(profileId);
+    const name = await callGeminiListName(prompt, apiKey, model, type, size);
+    return { name, usedAI: true };
+  } catch (e) {
+    logger.error('Gemini list name failed', e);
+    return { name: null, usedAI: false };
   }
 }
 
@@ -83,7 +129,8 @@ export async function aiSearch(
   query: string,
   trakt: TraktClient,
   profileId?: string,
-  type?: 'movie' | 'show'
+  type?: 'movie' | 'show',
+  limit = 20
 ) {
   const apiKey = await getGeminiKey(profileId);
   if (!apiKey) {
@@ -92,7 +139,7 @@ export async function aiSearch(
 
   try {
     const model = await getGeminiModel(profileId);
-    const items = await callGemini(query, apiKey, type, model);
+    const items = await callGemini(query, apiKey, type, model, limit);
     const filtered = type ? items.filter((item) => item.type === type) : items;
     if (filtered.length === 0) {
       return { results: [], usedAI: true };

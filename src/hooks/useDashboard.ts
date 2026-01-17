@@ -29,7 +29,7 @@ export interface TraktListItem {
 export interface DashboardList {
     id: string;
     name: string;
-    type: 'system' | 'custom' | 'trakt';
+  type: 'system' | 'custom' | 'trakt' | 'ai';
     enabled: boolean;
     owner?: string;
     description?: string;
@@ -744,6 +744,50 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     }
   };
 
+  const createAiList = async (prompt: string, type: 'movie' | 'show', size: number, privacy: string) => {
+    if (!profileId) return false;
+
+    setLoadingLists(true);
+    try {
+      const res = await fetch('/api/trakt/lists/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, prompt, type, size, privacy })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const listData = data.list;
+        const newList = {
+          id: listData.ids.slug,
+          name: listData.name,
+          type: 'ai' as const,
+          enabled: true,
+          owner: 'me',
+          description: listData.description,
+          item_count: data.itemCount ?? listData.item_count ?? 0,
+          content_type: type === 'movie' ? 'movie' : 'series'
+        };
+
+        const newLists = [...selectedLists, newList];
+        setSelectedLists(newLists);
+        saveLists(newLists);
+        addToast(`Created AI list: ${listData.name}`, 'success');
+        return true;
+      } else {
+        const err = await res.json();
+        addToast(err.error || 'Failed to create AI list', 'error');
+        return false;
+      }
+    } catch (e) {
+      console.error(e);
+      addToast('Failed to create AI list', 'error');
+      return false;
+    } finally {
+      setLoadingLists(false);
+    }
+  };
+
   const removeList = (listId: string) => {
     const list = selectedLists.find(l => l.id === listId);
     if (!list) return;
@@ -1197,6 +1241,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     renameList,
     updateList,
     createList,
+    createAiList,
     sortPreferences,
     hasLoadedBinge,
     hasLoadedEpisodes
