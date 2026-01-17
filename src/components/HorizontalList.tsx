@@ -294,7 +294,9 @@ const HorizontalList = memo(function HorizontalList({
             infoTooltip = "Shows where you have started a season but haven't finished it yet. Catch up on your active shows.";
         }
 
-        const displayCount = (typeof list.item_count === 'number') ? list.item_count : items.length;
+        const displayCount = list.type === 'system'
+            ? effectiveItems.length
+            : (typeof list.item_count === 'number' && list.item_count > 0 ? list.item_count : effectiveItems.length);
 
         const BadgeGroup = (
             <div className="flex gap-2">
