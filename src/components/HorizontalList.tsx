@@ -65,6 +65,12 @@ const HorizontalList = memo(function HorizontalList({
     const [showLeftArrow, setShowLeftArrow] = useState(false);
     const [showRightArrow, setShowRightArrow] = useState(true);
     const cacheRef = useRef<Record<string, ListItem[]>>({});
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [nameValue, setNameValue] = useState(list.name);
+
+    useEffect(() => {
+        setNameValue(list.name);
+    }, [list.name]);
 
     // Manage overflow visibility for smooth animations
     const [allowOverflow, setAllowOverflow] = useState(!compactMode);
@@ -326,33 +332,83 @@ const HorizontalList = memo(function HorizontalList({
                         <div className="flex items-center gap-3">
                             {dragHandle}
                             <div className="flex items-center gap-3">
-                                <h2
-                                    className="text-xl md:text-2xl font-bold text-white hover:text-purple-400 cursor-pointer transition-colors flex items-center gap-2"
-                                    onClick={() => onSelectList(list)}
-                                >
-                                    {list.name}
-                                    {onRenameList && list.type !== 'system' && list.id !== 'watchlist' && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const nextName = window.prompt('Rename list', list.name);
-                                                if (nextName && nextName.trim() && nextName.trim() !== list.name) {
-                                                    onRenameList(list.id, nextName.trim());
-                                                }
-                                            }}
-                                            className="text-gray-500 hover:text-purple-300 transition-colors"
-                                            title="Rename list"
+                                <div className="flex items-center gap-2 min-w-0">
+                                    {isEditingName ? (
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <input
+                                                value={nameValue}
+                                                onChange={(e) => setNameValue(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        const trimmed = nameValue.trim();
+                                                        if (trimmed && trimmed !== list.name) {
+                                                            onRenameList?.(list.id, trimmed);
+                                                        }
+                                                        setIsEditingName(false);
+                                                    }
+                                                    if (e.key === 'Escape') {
+                                                        setNameValue(list.name);
+                                                        setIsEditingName(false);
+                                                    }
+                                                }}
+                                                className="bg-transparent border-b border-transparent hover:border-purple-500/40 focus:border-purple-500 text-white text-xl md:text-2xl font-bold px-0 py-0 focus:ring-0 outline-none max-w-[220px] md:max-w-[320px]"
+                                                autoFocus
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const trimmed = nameValue.trim();
+                                                    if (trimmed && trimmed !== list.name) {
+                                                        onRenameList?.(list.id, trimmed);
+                                                    }
+                                                    setIsEditingName(false);
+                                                }}
+                                                className="text-green-400 hover:text-green-300 transition-colors"
+                                                title="Save name"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setNameValue(list.name);
+                                                    setIsEditingName(false);
+                                                }}
+                                                className="text-gray-500 hover:text-gray-300 transition-colors"
+                                                title="Cancel"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <h2
+                                            className="text-xl md:text-2xl font-bold text-white hover:text-purple-400 cursor-pointer transition-colors flex items-center gap-2"
+                                            onClick={() => onSelectList(list)}
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                        </button>
+                                            {list.name}
+                                            {onRenameList && list.type !== 'system' && list.id !== 'watchlist' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setIsEditingName(true);
+                                                    }}
+                                                    className="text-gray-500 hover:text-purple-300 transition-colors"
+                                                    title="Rename list"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                </button>
+                                            )}
+                                        </h2>
                                     )}
                                     {isHidden && (
                                         <span className="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded border bg-gray-700 text-gray-400 border-gray-600">Hidden</span>
                                     )}
                                     <span className="text-gray-500 font-normal text-sm ml-1">({displayCount})</span>
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-50"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                                </h2>
+                                </div>
 
                                 {infoTooltip && (
                                     <div className="relative group/info self-center">
