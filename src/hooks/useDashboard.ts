@@ -744,7 +744,13 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     }
   };
 
-  const createAiList = async (prompt: string, type: 'movie' | 'show', size: number, privacy: string) => {
+  const createAiList = async (
+    prompt: string,
+    type: 'movie' | 'show',
+    size: number,
+    privacy: string,
+    nameOverride?: string
+  ) => {
     if (!profileId) return false;
 
     setLoadingLists(true);
@@ -752,7 +758,7 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
       const res = await fetch('/api/trakt/lists/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId, prompt, type, size, privacy })
+        body: JSON.stringify({ profileId, prompt, type, size, privacy, name: nameOverride })
       });
 
       if (res.ok) {
@@ -792,19 +798,59 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
     const list = selectedLists.find(l => l.id === listId);
     if (!list) return;
 
+    if (list.type === 'system') {
+      toggleListVisibility(listId);
+      addToast('List hidden', 'info');
+      return;
+    }
+
+    const isOwnedList = list.type === 'custom' || list.type === 'ai' || list.owner === 'me';
+    if (!isOwnedList) {
+      toggleListVisibility(listId);
+      addToast('List hidden (not owned on Trakt)', 'info');
+      return;
+    }
+
     setModalConfig({
         isOpen: true,
-        title: 'Remove List?',
-        message: `Are you sure you want to remove the list "${list.name}"? This will only remove it from Most, not Trakt.`,
-        confirmText: 'Remove',
+      title: 'Delete List?',
+      message: `Are you sure you want to delete the list "${list.name}" from Trakt? This will remove it from both Trakt and Most.`,
+      confirmText: 'Delete',
         confirmColor: 'red',
-        onConfirm: () => {
-            const newLists = selectedLists.filter(l => l.id !== listId);
-            setSelectedLists(newLists);
-            saveLists(newLists);
-            closeModal();
-            addToast('List removed successfully', 'success');
+      onConfirm: async () => {
+        setLoadingLists(true);
+        try {
+          const res = await fetch(`/api/trakt/lists/${listId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId })
+          });
+
+          if (!res.ok) {
+            if (res.status >= 400 && res.status < 500) {
+              const newLists = selectedLists.filter(l => l.id !== listId);
+              setSelectedLists(newLists);
+              saveLists(newLists);
+              addToast('List cannot be deleted on Trakt. Hidden instead.', 'info');
+              return;
+            }
+            const err = await res.json();
+            addToast(err.error || 'Failed to delete list', 'error');
+            return;
+          }
+
+          const newLists = selectedLists.filter(l => l.id !== listId);
+          setSelectedLists(newLists);
+          saveLists(newLists);
+          addToast('List deleted successfully', 'success');
+        } catch (e) {
+          console.error(e);
+          addToast('Failed to delete list', 'error');
+        } finally {
+          closeModal();
+          setLoadingLists(false);
         }
+      }
     });
   };
 

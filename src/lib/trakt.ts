@@ -236,7 +236,7 @@ export class TraktClient {
     return DEFAULT_RETRY_DELAY_MS * attempt;
   }
 
-  private async request<T>(method: 'get' | 'post', url: string, data?: unknown, config?: object): Promise<T> {
+  private async request<T>(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: unknown, config?: object): Promise<T> {
     this.requestCount++;
     const requestId = randomUUID();
     const startTime = Date.now();
@@ -252,12 +252,23 @@ export class TraktClient {
           const durationMs = Date.now() - startTime;
           logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
           return response.data;
-        } else {
-          const response = await axios.post(url, data, axiosConfig);
+        }
+        if (method === 'put') {
+          const response = await axios.put(url, data, axiosConfig);
           const durationMs = Date.now() - startTime;
           logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
           return response.data;
         }
+        if (method === 'delete') {
+          const response = await axios.delete(url, { ...axiosConfig, data });
+          const durationMs = Date.now() - startTime;
+          logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
+          return response.data as T;
+        }
+        const response = await axios.post(url, data, axiosConfig);
+        const durationMs = Date.now() - startTime;
+        logger.debug('Trakt request completed', { requestId, method, url, durationMs, attempt });
+        return response.data;
       } catch (error) {
         lastError = error;
         if (!this.shouldRetry(error, attempt, maxAttempts)) {
@@ -305,10 +316,17 @@ export class TraktClient {
                  if (method === 'get') {
                     const response = await axios.get(url, retryConfig);
                     return response.data;
-                  } else {
-                    const response = await axios.post(url, data, retryConfig);
+                  }
+                  if (method === 'put') {
+                    const response = await axios.put(url, data, retryConfig);
                     return response.data;
                   }
+                  if (method === 'delete') {
+                    const response = await axios.delete(url, { ...retryConfig, data });
+                    return response.data;
+                  }
+                  const response = await axios.post(url, data, retryConfig);
+                  return response.data;
              }
           }
         } catch (refreshError) {
@@ -401,6 +419,17 @@ export class TraktClient {
       return response;
     } catch (error) {
       logger.error('Failed to update list', error);
+      throw error;
+    }
+  }
+
+  async deleteList(listId: string) {
+    logger.debug(`Deleting list: ${listId}`);
+    try {
+      const response = await this.request('delete', `${TRAKT_API_URL}/users/me/lists/${listId}`);
+      return response;
+    } catch (error) {
+      logger.error('Failed to delete list', error);
       throw error;
     }
   }

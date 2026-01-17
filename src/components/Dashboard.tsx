@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   DndContext, 
   closestCenter,
@@ -239,6 +239,13 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   const [searchShows, setSearchShows] = useState<SearchResult[]>([]);
   const [isSearchingTrakt, setIsSearchingTrakt] = useState(false);
 
+  const getAiListSize = useCallback((count: number) => {
+    if (count >= 100) return 100;
+    if (count >= 50) return 50;
+    if (count >= 20) return 20;
+    return 10;
+  }, []);
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
         if (searchQuery.trim().length > 2) {
@@ -342,11 +349,11 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
   //     }
   // }, [view]);
 
-  useEffect(() => {
+    useEffect(() => {
       if (loadMoreListsInView && view === 'home') {
-          setVisibleListsCount(prev => prev + 3);
+        setVisibleListsCount(prev => (prev < visibleLists.length ? prev + 3 : prev));
       }
-  }, [loadMoreListsInView, view, visibleListsCount]); // Added visibleListsCount to dependency for infinite loop if still in view
+    }, [loadMoreListsInView, view, visibleLists.length]);
 
   const openPlaceholderModal = (listId: string) => {
     const list = selectedLists.find(l => l.id === listId);
@@ -1059,6 +1066,26 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                         onMarkWatched={markAsWatched}
                                         onRemoveHistory={removeFromHistory}
                                         onSelectList={() => {}} 
+                                        headerActions={(
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (searchQuery.trim().length > 2) {
+                                                createAiList(
+                                                  searchQuery.trim(),
+                                                  'movie',
+                                                  getAiListSize(searchMovies.length),
+                                                  'private',
+                                                  searchQuery.trim()
+                                                );
+                                              }
+                                            }}
+                                            disabled={loadingLists || searchQuery.trim().length < 3}
+                                            className="px-3 py-1.5 text-xs font-bold rounded-md bg-purple-600/80 hover:bg-purple-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            Create list
+                                          </button>
+                                        )}
                                         compactMode={compactMode}
                                         onItemClick={(item, posterUrl) => handleItemClick(item as unknown as TraktListItem, posterUrl)}
                                      />
@@ -1077,6 +1104,26 @@ export default function Dashboard({ profileId: propProfileId, enableRegistration
                                         onMarkWatched={markAsWatched}
                                         onRemoveHistory={removeFromHistory}
                                         onSelectList={() => {}} 
+                                        headerActions={(
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (searchQuery.trim().length > 2) {
+                                                createAiList(
+                                                  searchQuery.trim(),
+                                                  'show',
+                                                  getAiListSize(searchShows.length),
+                                                  'private',
+                                                  searchQuery.trim()
+                                                );
+                                              }
+                                            }}
+                                            disabled={loadingLists || searchQuery.trim().length < 3}
+                                            className="px-3 py-1.5 text-xs font-bold rounded-md bg-purple-600/80 hover:bg-purple-600 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                          >
+                                            Create list
+                                          </button>
+                                        )}
                                         compactMode={compactMode}
                                         onItemClick={(item, posterUrl) => handleItemClick(item as unknown as TraktListItem, posterUrl)}
                                      />
