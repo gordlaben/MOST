@@ -1,12 +1,79 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { formatDateTime, type DateFormat } from '@/lib/date-format';
 import type { DashboardList } from '@/hooks/useDashboard';
 
 interface SettingsProps {
   profileId?: string;
+}
+
+type SelectOption = { value: string; label: string };
+
+function CustomSelect({
+  value,
+  options,
+  onChange,
+  placeholder = 'Select...'
+}: {
+  value: string;
+  options: SelectOption[];
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClick = (event: MouseEvent) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const selected = options.find((opt) => opt.value === value);
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="w-full bg-gray-950/70 border border-gray-800/80 rounded-xl px-4 py-2.5 pr-10 text-left text-white focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/30 outline-none transition-colors"
+      >
+        <span className={selected ? 'text-white' : 'text-gray-500'}>
+          {selected ? selected.label : placeholder}
+        </span>
+        <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </span>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-2 w-full rounded-xl border border-gray-800/80 bg-gray-950/95 shadow-xl shadow-black/40 backdrop-blur">
+          <ul className="max-h-56 overflow-y-auto py-1 text-sm">
+            {options.map((opt) => (
+              <li key={opt.value}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`w-full px-4 py-2 text-left transition-colors ${opt.value === value ? 'bg-purple-600/20 text-purple-200' : 'text-gray-200 hover:bg-gray-800/60'}`}
+                >
+                  {opt.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function Settings({ profileId: propProfileId }: SettingsProps) {
@@ -21,6 +88,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   
   const [loading, setLoading] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState<{
     totalItems: number;
@@ -43,6 +111,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   const [clearingCache, setClearingCache] = useState(false);
   const [message, setMessage] = useState('');
   const [origin, setOrigin] = useState('http://localhost:3000');
+  const hasLoadedSettings = useRef(false);
   
   const searchParams = useSearchParams();
   // Fallback to query param if prop is not provided (legacy support)
@@ -96,6 +165,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         setDateFormat(data.filters?.dateFormat || 'mdy');
         setGeminiModel(data.filters?.geminiModel || '');
         setLoading(false);
+        hasLoadedSettings.current = true;
       });
       
     fetchStats();
@@ -171,9 +241,13 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
   };
 
-  const persistSettings = async (listsOverride?: DashboardList[]) => {
-    setLoading(true);
-    setMessage('');
+  const persistSettings = async (listsOverride?: DashboardList[], silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setMessage('');
+    } else {
+      setSavingSettings(true);
+    }
     const listsToSave = listsOverride || lists;
 
     try {
@@ -189,18 +263,29 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
           GEMINI_MODEL: geminiModel
         }),
       });
-      setMessage('Settings saved successfully!');
+      if (!silent) {
+        setMessage('Settings saved successfully!');
+      }
     } catch {
-      setMessage('Error saving settings.');
+      if (!silent) {
+        setMessage('Error saving settings.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      } else {
+        setSavingSettings(false);
+      }
     }
   };
 
-  const saveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await persistSettings();
-  };
+  useEffect(() => {
+    if (!profileId || !hasLoadedSettings.current) return;
+    const timer = setTimeout(() => {
+      persistSettings(undefined, true);
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [profileId, rpdbKey, geminiKey, geminiModel, dateFormat]);
   
   const handleExport = () => {
     const customLists = lists.filter(l => l.type === 'custom' || l.type === 'ai');
@@ -297,17 +382,20 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   if (loading) return <div className="p-8 text-white">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-4 mb-8">
-          <a href={profileId ? `/stremio/${profileId}/configure` : "/"} className="p-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors">
+    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 text-white p-4 md:p-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="flex items-start gap-4 mb-8">
+          <a href={profileId ? `/stremio/${profileId}/configure` : "/"} className="p-2 bg-gray-900/70 rounded-xl border border-gray-800/80 hover:bg-gray-800/80 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </a>
-          <h1 className="text-2xl md:text-3xl font-bold">Settings {profileId ? '(Profile)' : ''}</h1>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold">Settings {profileId ? '(Profile)' : ''}</h1>
+            <p className="text-sm text-gray-400 mt-1">Manage your profile preferences, caching, and integrations.</p>
+          </div>
         </div>
         
         {!clientId && (
-        <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700 mb-8">
+        <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20 mb-8">
           <h2 className="text-lg md:text-xl font-semibold mb-4 text-purple-400">How to get your Trakt API Keys</h2>
           <ol className="list-decimal list-inside space-y-3 text-gray-300 text-sm">
             <li>
@@ -344,7 +432,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         )}
 
         {!clientId && (
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-yellow-700/50 mb-8">
+          <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-yellow-700/50 shadow-lg shadow-black/20 mb-8">
             <h2 className="text-lg md:text-xl font-semibold mb-4 text-yellow-400">Configuration Missing</h2>
             <div className="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded text-yellow-200 text-sm">
               ⚠️ Please set <code>TRAKT_CLIENT_ID</code> and <code>TRAKT_CLIENT_SECRET</code> in your environment variables or Docker configuration.
@@ -354,25 +442,25 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         )}
 
         {profileId && (
-        <form onSubmit={saveSettings} className="space-y-6">
+        <div className="space-y-7">
 
             {/* Library Stats & Actions */}
-            <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+              <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
               <h2 className="text-xl font-bold mb-4 text-purple-400">Library Stats & Actions</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                 <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Total Items</div>
                     <div className="text-2xl font-bold text-white">{stats?.totalItems || 0}</div>
                  </div>
-                 <div className="bg-gray-700 p-3 rounded text-center">
+                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Movies</div>
                     <div className="text-2xl font-bold text-white">{stats?.movies || 0}</div>
                  </div>
-                 <div className="bg-gray-700 p-3 rounded text-center">
+                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Series</div>
                     <div className="text-2xl font-bold text-white">{stats?.shows || 0}</div>
                  </div>
-                 <div className="bg-gray-700 p-3 rounded text-center">
+                 <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Last Sync</div>
                     <div className="text-sm font-bold mt-1 text-white">
                       {stats?.lastSync ? (formatDateTime(stats.lastSync, dateFormat) || 'Invalid Date') : 'Never'}
@@ -407,30 +495,30 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </div>
 
             {/* Cache Stats */}
-            <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
               <h2 className="text-xl font-bold mb-4 text-purple-400">Cached Posters</h2>
               <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Cached Posters</div>
                   <div className="text-2xl font-bold text-white">{cacheStats?.totalCount ?? 0}</div>
                 </div>
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Size</div>
                   <div className="text-2xl font-bold text-white">{formatBytes(cacheStats?.totalBytes ?? 0)}</div>
                 </div>
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Posters</div>
                   <div className="text-2xl font-bold text-red-400">{cacheStats?.unusedCount ?? 0}</div>
                 </div>
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Size</div>
                   <div className="text-2xl font-bold text-red-400">{formatBytes(cacheStats?.unusedBytes ?? 0)}</div>
                 </div>
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Missing Posters</div>
                   <div className="text-2xl font-bold text-yellow-300">{cacheStats?.missingCount ?? 0}</div>
                 </div>
-                <div className="bg-gray-700 p-3 rounded text-center">
+                <div className="bg-gray-900/70 border border-gray-800/80 p-3 rounded-xl text-center">
                   <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Errors</div>
                   <div className="text-2xl font-bold text-yellow-300">{cacheStats?.errorCount ?? 0}</div>
                 </div>
@@ -462,7 +550,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               </p>
             </div>
 
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+          <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
             <h2 className="text-xl font-bold mb-4 text-purple-400">Custom Lists Management</h2>
             
             <div className="flex items-center mb-4">
@@ -471,7 +559,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
                     id="overwriteExisting"
                     checked={overwriteExisting}
                     onChange={(e) => setOverwriteExisting(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500 focus:ring-2"
+                  className="w-4 h-4 text-purple-500 bg-gray-900 border-gray-700 rounded focus:ring-purple-500 focus:ring-2"
                 />
                 <label htmlFor="overwriteExisting" className="ml-2 text-sm font-medium text-gray-300">
                     Overwrite existing lists on import
@@ -482,14 +570,14 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               <button
                 type="button"
                 onClick={handleExport}
-                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors border border-gray-600"
+                className="flex-1 py-2 bg-gray-900/70 hover:bg-gray-900 rounded-lg font-medium transition-colors border border-gray-800/80"
               >
                 Export to File
               </button>
                <button
                 type="button"
                 onClick={handleCopyToClipboard}
-                className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors border border-gray-600"
+                className="flex-1 py-2 bg-gray-900/70 hover:bg-gray-900 rounded-lg font-medium transition-colors border border-gray-800/80"
               >
                 Copy to Clipboard
               </button>
@@ -508,7 +596,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </p>
           </div>
 
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+          <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
             <h2 className="text-xl font-bold mb-4 text-purple-400">Poster Settings (Optional)</h2>
             <label className="block text-sm font-medium text-gray-400 mb-2">
               RPDB API Key
@@ -517,7 +605,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               type="text"
               value={rpdbKey}
               onChange={(e) => setRpdbKey(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full bg-gray-950/70 border border-gray-800/80 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/30 outline-none transition-colors"
               placeholder="Enter your RPDB API Key (leave empty for free tier)"
             />
             <p className="text-xs text-gray-500 mt-2">
@@ -527,7 +615,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </p>
           </div>
 
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+          <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
             <h2 className="text-xl font-bold mb-4 text-purple-400">AI Search (Gemini)</h2>
             <label className="block text-sm font-medium text-gray-400 mb-2">
               Gemini API Key
@@ -536,7 +624,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               type="password"
               value={geminiKey}
               onChange={(e) => setGeminiKey(e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+              className="w-full bg-gray-950/70 border border-gray-800/80 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/30 outline-none transition-colors"
               placeholder="Enter your Gemini API Key"
             />
             <p className="text-xs text-gray-500 mt-2">
@@ -556,19 +644,18 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
                   {loadingGeminiModels ? 'Loading…' : 'Refresh models'}
                 </button>
               </div>
-              <select
+              <CustomSelect
                 value={geminiModel}
-                onChange={(e) => setGeminiModel(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
-              >
-                <option value="">Auto (gemini-flash-latest)</option>
-                {geminiModel && !geminiModels.includes(geminiModel) && (
-                  <option value={geminiModel}>{geminiModel}</option>
-                )}
-                {geminiModels.map((model) => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
+                onChange={setGeminiModel}
+                placeholder="Auto (gemini-flash-latest)"
+                options={[
+                  { value: '', label: 'Auto (gemini-flash-latest)' },
+                  ...(geminiModel && !geminiModels.includes(geminiModel)
+                    ? [{ value: geminiModel, label: geminiModel }]
+                    : []),
+                  ...geminiModels.map((model) => ({ value: model, label: model }))
+                ]}
+              />
               <p className="text-xs text-gray-500 mt-2">
                 Model list is loaded from your Gemini API key.
               </p>
@@ -578,41 +665,36 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </p>
           </div>
 
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+          <div className="bg-gray-900/60 p-5 md:p-6 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
             <h2 className="text-xl font-bold mb-4 text-purple-400">Date Format</h2>
             <label className="block text-sm font-medium text-gray-400 mb-2">
               Date Format
             </label>
-            <select
+            <CustomSelect
               value={dateFormat}
-              onChange={(e) => setDateFormat(e.target.value as DateFormat)}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
-            >
-              <option value="mdy">MM/DD/YYYY</option>
-              <option value="dmy">DD/MM/YYYY</option>
-              <option value="ymd">YYYY-MM-DD</option>
-            </select>
+              onChange={(val) => setDateFormat(val as DateFormat)}
+              options={[
+                { value: 'mdy', label: 'MM/DD/YYYY' },
+                { value: 'dmy', label: 'DD/MM/YYYY' },
+                { value: 'ymd', label: 'YYYY-MM-DD' }
+              ]}
+            />
             <p className="text-xs text-gray-500 mt-2">
               This format will be used across the UI for dates and date-times.
             </p>
           </div>
 
           {message && (
-            <div className={`p-4 rounded ${message.includes('Error') ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`}>
+            <div className={`p-4 rounded-xl border ${message.includes('Error') ? 'bg-red-900/40 border-red-800/60 text-red-200' : 'bg-green-900/40 border-green-800/60 text-green-200'} shadow-lg shadow-black/10`}>
               {message}
             </div>
           )}
 
-          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : 'Save Settings'}
-            </button>
+          <div className="text-xs text-gray-500 flex items-center justify-between">
+            <span>Changes save automatically.</span>
+            {savingSettings && <span className="text-purple-300">Saving…</span>}
           </div>
-        </form>
+        </div>
         )}
 
 
