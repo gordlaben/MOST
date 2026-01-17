@@ -55,6 +55,10 @@ It also helps you wait. Instead of checking every week for new episodes, the "Bi
 *   **👥 Multi-User**: Supports multiple profiles, so everyone in the house can use their own Trakt account.
 *   **📅 Calendar Feed**: Generates a personal `.ics` link for your calendar apps so you know when a binge is coming up.
 *   **⚡ Local Caching**: Caches metadata and RPDB posters locally. Your lists load instantly because they aren't waiting for external APIs.
+*   **🤖 AI Search & Lists**: Semantic search powered by Gemini, plus one-click AI list creation from prompts or search results.
+*   **✍️ Inline List Renaming**: Rename lists directly in the UI and sync the new name to Trakt.
+*   **🧹 Cache Insights**: Visual cache stats with one-click cleanup for unused posters.
+*   **⚙️ Smart Settings**: Autosave settings with profile-specific AI model selection.
 *   **🛡️ Privacy**: Self-hosted. Your data stays on your server.
 
 ---
