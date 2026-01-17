@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TraktBingeReadyShow, TraktEpisodeLeftShow } from '@/lib/trakt';
 import { getProfile } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
@@ -61,7 +60,7 @@ export async function GET(
 
         // Override sortBy with per-list preference
         if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
-          filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a';
+          filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
         }
       }
       if (profile.rpdbKey) {
@@ -85,8 +84,8 @@ export async function GET(
   }
 
   // Handle Sort Param from URL (Overrides profile settings)
-  if (sortParam && (sortParam === 'newest' || sortParam === 'oldest' || sortParam === 'title' || sortParam === 'title_z_a' || sortParam === 'random')) {
-    filters.sortBy = sortParam as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+  if (sortParam && (sortParam === 'newest' || sortParam === 'oldest' || sortParam === 'title' || sortParam === 'title_z_a' || sortParam === 'rating_desc' || sortParam === 'rating_asc' || sortParam === 'random')) {
+    filters.sortBy = sortParam as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
   }
 
   // Ensure strict key order for cache key consistency with API routes
@@ -184,7 +183,7 @@ export async function GET(
     // Map to Stremio format
     const origin = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
     const metas: StremioMeta[] = items.map((item: CatalogItem) => (
-      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true)
+      mapTraktItemToMeta(item, type, rpdbKey, origin, catalogId, true, profileId)
     ));
 
   // Inject user-defined placeholder if configured

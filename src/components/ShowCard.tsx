@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import { formatDate, type DateFormat } from '@/lib/date-format';
 
 interface ShowCardProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -14,6 +15,7 @@ interface ShowCardProps {
   variant?: 'horizontal' | 'vertical';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onContentClick?: (item: any, posterUrl?: string | null) => void;
+  dateFormat?: DateFormat;
 }
 
 export default function ShowCard({ 
@@ -24,7 +26,8 @@ export default function ShowCard({
   onMarkWatched, 
   onRemoveHistory,
   variant = 'horizontal',
-  onContentClick
+  onContentClick,
+  dateFormat = 'mdy'
 }: ShowCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false);
   const isSystemList = activeTab === 'binge_ready' || activeTab === 'episodes_left';
@@ -216,16 +219,16 @@ export default function ShowCard({
             
             {isSystemList && variant === 'vertical' && !isMovie && (
                 <span className='block w-full text-purple-400 font-medium mt-1'>
-                    {item.nextEpisode ? 'S' + item.nextEpisode.season + ' E' + item.nextEpisode.number : 'Ended'}
+                {item.nextEpisode ? 'S' + item.nextEpisode.season + ' E' + item.nextEpisode.number : 'Series ended'}
                 </span>
             )}
           </div>
           
           {variant === 'horizontal' && (
               <>
-                  {item.releaseDate && activeTab === 'binge_ready' && (
+                  {item.releaseDate && activeTab === 'binge_ready' && formatDate(item.releaseDate, dateFormat) && (
                     <p className='text-xs text-green-400 mt-0.5 md:mt-1'>
-                        Finale: {new Date(item.releaseDate).toLocaleDateString()}
+                        Finale: {formatDate(item.releaseDate, dateFormat)}
                     </p>
                   )}
                   {isSystemList && item.watchedEpisodes > 0 && (
@@ -246,6 +249,9 @@ export default function ShowCard({
                      <div className='w-full h-1 bg-gray-700 rounded-full overflow-hidden'>
                         <div className='h-full bg-purple-500 rounded-full' style={{ width: (item.watchedEpisodes / item.totalEpisodes * 100) + '%' }} />
                     </div>
+                <p className='text-[10px] text-gray-400 mt-1'>
+                  Progress: {item.watchedEpisodes} / {item.totalEpisodes} watched
+                </p>
                 </div>
           )}
         </div>

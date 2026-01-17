@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
-import path from 'path';
-import { cacheImage, getImagePathIfCached } from '@/lib/images';
+import { cacheImage, getImageMetaIfCached } from '@/lib/images';
 
 // Helper to convert Node stream to Web stream
 function nodeStreamToWeb(nodeStream: fs.ReadStream): ReadableStream {
@@ -21,6 +20,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const url = searchParams.get('url');
   const fallback = searchParams.get('fallback');
+  const profileId = searchParams.get('profileId') || undefined;
 
   if (!url) {
     return new NextResponse('Missing url parameter', { status: 400 });
@@ -28,20 +28,49 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Check if we have it locally
-    const existingPath = await getImagePathIfCached(url);
+    const cachedMeta = await getImageMetaIfCached(url, profileId);
 
-    if (existingPath) {
+    if (cachedMeta) {
+        const ifNoneMatch = request.headers.get('if-none-match');
+        const ifModifiedSince = request.headers.get('if-modified-since');
+
+        if (ifNoneMatch && ifNoneMatch === cachedMeta.etag) {
+          return new NextResponse(null, {
+            status: 304,
+            headers: {
+              'ETag': cachedMeta.etag,
+              'Last-Modified': cachedMeta.lastModified,
+              'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
+              'Access-Control-Allow-Origin': '*'
+            }
+          });
+        }
+
+        if (ifModifiedSince) {
+          const sinceTime = Date.parse(ifModifiedSince);
+          if (!Number.isNaN(sinceTime) && sinceTime >= cachedMeta.mtimeMs) {
+            return new NextResponse(null, {
+              status: 304,
+              headers: {
+                'ETag': cachedMeta.etag,
+                'Last-Modified': cachedMeta.lastModified,
+                'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
+                'Access-Control-Allow-Origin': '*'
+              }
+            });
+          }
+        }
+
         // Serve local file using stream to save memory
-        const stream = fs.createReadStream(existingPath);
+        const stream = fs.createReadStream(cachedMeta.filePath);
         const webStream = nodeStreamToWeb(stream);
-        
-        const ext = path.extname(existingPath);
-        const contentType = ext === '.png' ? 'image/png' : 'image/jpeg'; // naive but works
         
         return new NextResponse(webStream as unknown as BodyInit, {
           headers: {
-            'Content-Type': contentType,
-            'Cache-Control': 'public, max-age=31536000, immutable',
+            'Content-Type': cachedMeta.contentType,
+            'Cache-Control': 'public, max-age=31536000, immutable, stale-while-revalidate=86400, stale-if-error=86400',
+            'ETag': cachedMeta.etag,
+            'Last-Modified': cachedMeta.lastModified,
             'Access-Control-Allow-Origin': '*',
           },
         });
@@ -49,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Not cached? Trigger background download and Redirect immediately
     // Don't await this! Fire and forget.
-    void cacheImage(url);
+    void cacheImage(url, profileId);
 
     // Redirect to the fallback (if available) or original URL so the user sees the image NOW
     // Using fallback prevents hitting API limits on the provider (e.g. RPDB) from the client

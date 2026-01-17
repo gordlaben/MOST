@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { formatDateTime, type DateFormat } from '@/lib/date-format';
 import type { DashboardList } from '@/hooks/useDashboard';
 
 interface SettingsProps {
@@ -11,6 +12,7 @@ interface SettingsProps {
 export default function Settings({ profileId: propProfileId }: SettingsProps) {
   const [clientId, setClientId] = useState('');
   const [rpdbKey, setRpdbKey] = useState('');
+  const [dateFormat, setDateFormat] = useState<DateFormat>('mdy');
   const [lists, setLists] = useState<DashboardList[]>([]);
   const [overwriteExisting, setOverwriteExisting] = useState(false);
   
@@ -23,6 +25,18 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     lastSync: string | null;
     nextSync: string | null;
   } | null>(null);
+  const [cacheStats, setCacheStats] = useState<{
+    totalCount: number;
+    totalBytes: number;
+    unusedCount: number;
+    unusedBytes: number;
+    usedCount: number;
+    usedBytes: number;
+    missingCount: number;
+    errorCount: number;
+    lastError?: { url: string; reason: string; at: string } | null;
+  } | null>(null);
+  const [clearingCache, setClearingCache] = useState(false);
   const [message, setMessage] = useState('');
   const [origin, setOrigin] = useState('http://localhost:3000');
   
@@ -35,6 +49,14 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     fetch(`/api/settings/stats?profileId=${profileId}`)
       .then(res => res.json())
       .then(data => setStats(data))
+      .catch(console.error);
+  }, [profileId]);
+
+  const fetchCacheStats = useCallback(() => {
+    if (!profileId) return;
+    fetch(`/api/settings/cache?profileId=${profileId}`)
+      .then(res => res.json())
+      .then(data => setCacheStats(data))
       .catch(console.error);
   }, [profileId]);
 
@@ -51,11 +73,13 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         setClientId(data.clientId || '');
         setRpdbKey(data.rpdbKey === 't0-free-rpdb' ? '' : data.rpdbKey || '');
         setLists(data.selectedLists || []);
+        setDateFormat(data.filters?.dateFormat || 'mdy');
         setLoading(false);
       });
       
     fetchStats();
-  }, [profileId, fetchStats]);
+    fetchCacheStats();
+  }, [profileId, fetchStats, fetchCacheStats]);
 
   const handleRefreshLists = async () => {
     setRefreshing(true);
@@ -79,6 +103,52 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     }
   };
 
+  const handleClearUnusedCache = async () => {
+    if (!profileId || clearingCache) return;
+    const confirmed = window.confirm('Clear unused cached posters? This cannot be undone.');
+    if (!confirmed) return;
+
+    setClearingCache(true);
+    setMessage('Clearing unused cached posters...');
+    try {
+      const res = await fetch('/api/settings/cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId, action: 'clear-unused' })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setMessage(`Removed ${data.removedCount} unused posters.`);
+        setCacheStats({
+          totalCount: data.totalCount,
+          totalBytes: data.totalBytes,
+          unusedCount: data.unusedCount,
+          unusedBytes: data.unusedBytes,
+          usedCount: data.usedCount,
+          usedBytes: data.usedBytes,
+          missingCount: data.missingCount,
+          errorCount: data.errorCount,
+          lastError: data.lastError
+        });
+      } else {
+        setMessage('Failed to clear unused cache.');
+      }
+    } catch {
+      setMessage('Error clearing unused cache.');
+    } finally {
+      setClearingCache(false);
+    }
+  };
+
+  const formatBytes = (bytes: number) => {
+    if (!bytes || bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const value = bytes / Math.pow(1024, i);
+    return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+  };
+
   const persistSettings = async (listsOverride?: DashboardList[]) => {
     setLoading(true);
     setMessage('');
@@ -91,7 +161,8 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         body: JSON.stringify({ 
           profileId, // Pass profileId to save to specific profile
           rpdbKey,
-          selectedLists: listsToSave
+          selectedLists: listsToSave,
+          DATE_FORMAT: dateFormat
         }),
       });
       setMessage('Settings saved successfully!');
@@ -254,14 +325,15 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             <div className="p-3 bg-yellow-900/30 border border-yellow-700/50 rounded text-yellow-200 text-sm">
               ⚠️ Please set <code>TRAKT_CLIENT_ID</code> and <code>TRAKT_CLIENT_SECRET</code> in your environment variables or Docker configuration.
             </div>
+
           </div>
         )}
 
         {profileId && (
-        <form onSubmit={saveSettings} className="space-y-6 bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+        <form onSubmit={saveSettings} className="space-y-6">
 
             {/* Library Stats & Actions */}
-            <div className="border-b border-gray-700 pb-6 mb-6">
+            <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
               <h2 className="text-xl font-bold mb-4 text-purple-400">Library Stats & Actions</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                  <div className="bg-gray-700 p-3 rounded text-center">
@@ -279,7 +351,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
                  <div className="bg-gray-700 p-3 rounded text-center">
                     <div className="text-gray-400 text-xs uppercase tracking-wider">Last Sync</div>
                     <div className="text-sm font-bold mt-1 text-white">
-                      {stats?.lastSync ? new Date(stats.lastSync).toLocaleString() : 'Never'}
+                      {stats?.lastSync ? (formatDateTime(stats.lastSync, dateFormat) || 'Invalid Date') : 'Never'}
                     </div>
                  </div>
               </div>
@@ -310,8 +382,64 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               </div>
             </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-purple-400">Custom Lists Management</h3>
+            {/* Cache Stats */}
+            <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+              <h2 className="text-xl font-bold mb-4 text-purple-400">Cached Posters</h2>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cached Posters</div>
+                  <div className="text-2xl font-bold text-white">{cacheStats?.totalCount ?? 0}</div>
+                </div>
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Size</div>
+                  <div className="text-2xl font-bold text-white">{formatBytes(cacheStats?.totalBytes ?? 0)}</div>
+                </div>
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Posters</div>
+                  <div className="text-2xl font-bold text-red-400">{cacheStats?.unusedCount ?? 0}</div>
+                </div>
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Unused Size</div>
+                  <div className="text-2xl font-bold text-red-400">{formatBytes(cacheStats?.unusedBytes ?? 0)}</div>
+                </div>
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Missing Posters</div>
+                  <div className="text-2xl font-bold text-yellow-300">{cacheStats?.missingCount ?? 0}</div>
+                </div>
+                <div className="bg-gray-700 p-3 rounded text-center">
+                  <div className="text-gray-400 text-xs uppercase tracking-wider">Cache Errors</div>
+                  <div className="text-2xl font-bold text-yellow-300">{cacheStats?.errorCount ?? 0}</div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={handleClearUnusedCache}
+                  disabled={clearingCache}
+                  className={`flex-1 py-3 px-4 rounded font-bold text-white transition-all shadow-lg ${
+                    clearingCache
+                      ? 'bg-red-900/50 cursor-not-allowed border border-red-800'
+                      : 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 hover:shadow-red-500/20 active:scale-[0.98]'
+                  }`}
+                >
+                  {clearingCache ? 'Clearing Cache...' : 'Clear Unused Cache'}
+                </button>
+              </div>
+              {cacheStats?.lastError && (
+                <div className="mt-3 text-xs text-yellow-200/80 bg-yellow-900/30 border border-yellow-700/40 rounded p-3">
+                  <div className="font-semibold">Last Cache Error</div>
+                  <div className="truncate">{cacheStats.lastError.url}</div>
+                  <div className="text-yellow-200/70">{cacheStats.lastError.reason} · {formatDateTime(cacheStats.lastError.at, dateFormat)}</div>
+                </div>
+              )}
+              <p className="text-xs text-gray-500 mt-2">
+                Cache stats update when you load this page or after clearing unused cache.
+              </p>
+            </div>
+
+          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <h2 className="text-xl font-bold mb-4 text-purple-400">Custom Lists Management</h2>
             
             <div className="flex items-center mb-4">
                 <input
@@ -356,8 +484,8 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </p>
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4 text-purple-400">Poster Settings (Optional)</h3>
+          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <h2 className="text-xl font-bold mb-4 text-purple-400">Poster Settings (Optional)</h2>
             <label className="block text-sm font-medium text-gray-400 mb-2">
               RPDB API Key
             </label>
@@ -375,19 +503,40 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             </p>
           </div>
 
+          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <h2 className="text-xl font-bold mb-4 text-purple-400">Date Format</h2>
+            <label className="block text-sm font-medium text-gray-400 mb-2">
+              Date Format
+            </label>
+            <select
+              value={dateFormat}
+              onChange={(e) => setDateFormat(e.target.value as DateFormat)}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+            >
+              <option value="mdy">MM/DD/YYYY</option>
+              <option value="dmy">DD/MM/YYYY</option>
+              <option value="ymd">YYYY-MM-DD</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-2">
+              This format will be used across the UI for dates and date-times.
+            </p>
+          </div>
+
           {message && (
             <div className={`p-4 rounded ${message.includes('Error') ? 'bg-red-900/50 text-red-200' : 'bg-green-900/50 text-green-200'}`}>
               {message}
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Saving...' : 'Save Settings'}
-          </button>
+          <div className="bg-gray-800 p-4 md:p-6 rounded-xl border border-gray-700">
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save Settings'}
+            </button>
+          </div>
         </form>
         )}
 

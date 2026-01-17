@@ -3,13 +3,13 @@ import { getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import { getAppConfig } from '@/lib/config';
-import { cacheImage } from '@/lib/images';
+import { prefetchImages } from '@/lib/images';
 
 export interface CatalogFilters {
   includeEnded?: boolean;
   includeCanceled?: boolean;
   includeReturning?: boolean;
-  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random';
+  sortBy?: 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
   forceRefresh?: boolean;
 }
 
@@ -18,11 +18,20 @@ export type CatalogItem =
   | TraktEpisodeLeftShow 
   | { show?: TraktShow; movie?: TraktMovie; [key: string]: unknown };
 
+interface SelectedListItem {
+  id: string;
+  name: string;
+  enabled?: boolean;
+  type?: string;
+  content_type?: string;
+  owner?: string;
+}
+
 
 // In-memory lock to prevent concurrent refreshes
 const refreshLocks: Record<string, boolean> = {};
 
-export async function detectAndUpdateListTypes(profileId: string, lists: any[], forceUpdate = false) {
+export async function detectAndUpdateListTypes(profileId: string, lists: SelectedListItem[], forceUpdate = false) {
   let updated = false;
   try {
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
@@ -181,11 +190,11 @@ export async function refreshCatalog(catalogId: string, cacheKey: string, filter
       },
     });
 
-    // Cache images in background
+    // Cache images in background (rate-limited)
     (async () => {
       try {
         logger.info(`Starting background image caching for ${cacheKey}`);
-        let count = 0;
+        const posterUrls: string[] = [];
         for (const item of items) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const content = (('show' in item && item.show) || ('movie' in item && item.movie) || item) as any;
@@ -200,12 +209,13 @@ export async function refreshCatalog(catalogId: string, cacheKey: string, filter
              }
 
              if (posterUrl) {
-               await cacheImage(posterUrl);
-               count++;
+               posterUrls.push(posterUrl);
              }
           }
         }
-        logger.info(`Cached ${count} images for ${cacheKey}`);
+
+        await prefetchImages(posterUrls, profileId, 20);
+        logger.info(`Queued ${posterUrls.length} images for ${cacheKey}`);
       } catch (e) {
         logger.error(`Failed to cache images for ${cacheKey}`, e);
       }

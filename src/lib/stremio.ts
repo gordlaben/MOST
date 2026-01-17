@@ -28,7 +28,8 @@ export function mapTraktItemToMeta(
   rpdbKey: string | undefined, 
   origin: string, 
   catalogId?: string,
-  useLocalCache: boolean = true
+  useLocalCache: boolean = true,
+  profileId?: string
 ): StremioMeta {
   const content = item.show || item.movie || item;
   let poster = null;
@@ -66,7 +67,8 @@ export function mapTraktItemToMeta(
     const fallbackParam = originalPoster && poster.includes('ratingposterdb.com')
       ? `&fallback=${encodeURIComponent(originalPoster)}`
       : '';
-    poster = `${origin}/api/image?url=${encodeURIComponent(poster)}${fallbackParam}`;
+    const profileParam = profileId ? `&profileId=${encodeURIComponent(profileId)}` : '';
+    poster = `${origin}/api/image?url=${encodeURIComponent(poster)}${fallbackParam}${profileParam}`;
   }
 
   // 4. Generate Description

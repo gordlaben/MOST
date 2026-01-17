@@ -52,7 +52,7 @@ export async function GET(request: Request) {
   }
 
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
-  const sortBy = (sortByParam as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'random') || undefined;
+  const sortBy = (sortByParam as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random') || undefined;
   const type = (typeParam as 'movie' | 'show') || undefined;
   
   const includeEnded = includeEndedParam !== 'false';

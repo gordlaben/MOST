@@ -35,6 +35,7 @@ export interface HorizontalListProps {
         includeReturning: boolean;
     };
     type?: 'movie' | 'show';
+    dateFormat?: import('@/lib/date-format').DateFormat;
 }
 
 const HorizontalList = memo(function HorizontalList({
@@ -54,7 +55,8 @@ const HorizontalList = memo(function HorizontalList({
     version = 0,
     sortBy,
     filters,
-    type
+    type,
+    dateFormat
 }: HorizontalListProps) {
     const [items, setItems] = useState<ListItem[]>(listItems || []);
     const [loading, setLoading] = useState(!listItems);
@@ -206,7 +208,7 @@ const HorizontalList = memo(function HorizontalList({
             if (profileId) {
                 fetchItems();
             }
-        }, [list, listItems, profileId, version, sortBy, filters, inView, cacheKey]);
+        }, [list, listItems, profileId, version, sortBy, filters, inView, cacheKey, type]);
 
         const isLoading = listLoading ?? loading;
 
@@ -466,6 +468,7 @@ const HorizontalList = memo(function HorizontalList({
                                                 isRemoving={false}
                                                 onContentClick={onItemClick}
                                                 variant="vertical"
+                                                dateFormat={dateFormat}
                                             />
                                         </div>
                                     );

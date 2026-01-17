@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatDate, type DateFormat } from '@/lib/date-format';
 
 interface Profile {
   id: string;
@@ -14,6 +15,7 @@ export default function AdminPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dateFormat, setDateFormat] = useState<DateFormat>('mdy');
 
   useEffect(() => {
     const storedPassword = sessionStorage.getItem('adminPassword');
@@ -22,6 +24,19 @@ export default function AdminPage() {
       verifyPassword(storedPassword);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.filters?.dateFormat) {
+          setDateFormat(data.filters.dateFormat);
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
   }, []);
 
   const verifyPassword = async (pwd: string) => {
@@ -162,7 +177,7 @@ export default function AdminPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-gray-400 text-sm">
-                      {new Date(profile.createdAt).toLocaleDateString()}
+                      {formatDate(profile.createdAt, dateFormat) || 'Invalid Date'}
                     </td>
                     <td className="px-6 py-4 text-right space-x-2">
                       <a

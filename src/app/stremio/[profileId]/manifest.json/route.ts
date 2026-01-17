@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import packageJson from '../../../../../package.json';
-import { TraktClient } from '@/lib/trakt';
-import { getTraktCredentials } from '@/lib/settings';
 import { logger } from '@/lib/logger';
 import { detectAndUpdateListTypes } from '@/lib/catalog';
 import { getAppConfig } from '@/lib/config';
@@ -13,6 +11,14 @@ interface SelectedList {
     enabled: boolean;
     type?: string;
     content_type?: string;
+    owner?: string;
+}
+
+interface CatalogDefinition {
+  type: 'series' | 'movie';
+  id: string;
+  name: string;
+  extra?: Array<{ name: string; options?: string[]; isRequired?: boolean }>;
 }
 
 
@@ -47,35 +53,30 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
     }
   ];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let catalogs: any[] = [];
+  let catalogs: CatalogDefinition[] = [];
 
   const sortExtra = {
       name: "sort",
-      options: ["newest", "oldest", "title", "title_z_a", "random"],
+      options: ["newest", "oldest", "title", "title_z_a", "rating_desc", "rating_asc", "random"],
       isRequired: false
   };
 
   if (profile?.selectedLists) {
     try {
-      const selectedLists = JSON.parse(profile.selectedLists);
+      const selectedLists = JSON.parse(profile.selectedLists) as SelectedList[];
       
       // Check if any list needs update (missing content_type)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const needsUpdate = selectedLists.some((l: any) => l.type !== 'system' && !l.content_type);
+      const needsUpdate = selectedLists.some((l) => l.type !== 'system' && !l.content_type);
       
       if (needsUpdate) {
           // Trigger background update
-          // @ts-ignore
-          detectAndUpdateListTypes(profileId, JSON.parse(profile.selectedLists)).catch(e => logger.error('Background list type detection failed', e));
+          detectAndUpdateListTypes(profileId, selectedLists).catch(e => logger.error('Background list type detection failed', e));
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const hasSystemLists = selectedLists.some((l: any) => l.type === 'system');
+      const hasSystemLists = selectedLists.some((l) => l.type === 'system');
 
       if (hasSystemLists) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        selectedLists.forEach((list: any) => {
+        selectedLists.forEach((list) => {
           if (list.enabled) {
             if (list.type === 'system') {
                 catalogs.push({

@@ -2,7 +2,7 @@ import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-import { cacheImage } from '@/lib/images';
+import { prefetchImages } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import { createRequestContext } from '@/lib/request-logging';
 import { getAppConfig } from '@/lib/config';
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const includeEnded = searchParams.get('includeEnded') !== 'false';
   const includeCanceled = searchParams.get('includeCanceled') !== 'false';
   const includeReturning = searchParams.get('includeReturning') !== 'false';
-  const sortBy = (searchParams.get('sortBy') as 'newest' | 'oldest' | 'title') || 'newest';
+  const sortBy = (searchParams.get('sortBy') as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random') || 'newest';
   const profileId = searchParams.get('profileId') || undefined;
 
   const filters = { includeEnded, includeCanceled, includeReturning, sortBy };
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
              const progress = { type: 'progress', message, current, total };
              try {
                 controller.enqueue(encoder.encode(JSON.stringify(progress) + '\n'));
-             } catch (e) {
+             } catch {
                 // Controller closed (client hung up), ignore
              }
           }, { ...filters, forceRefresh });
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
           (async () => {
             try {
               logger.info(`Starting background image caching for Binge Ready shows`);
-              let count = 0;
+              const posterUrls: string[] = [];
               for (const item of shows) {
                 const content = item.show;
                 if (content?.images?.poster) {
@@ -120,12 +120,12 @@ export async function GET(request: NextRequest) {
                    }
       
                    if (posterUrl) {
-                     await cacheImage(posterUrl);
-                     count++;
+                     posterUrls.push(posterUrl);
                    }
                 }
               }
-              logger.info(`Cached ${count} images for Binge Ready shows`);
+              await prefetchImages(posterUrls, profileId, 20);
+              logger.info(`Queued ${posterUrls.length} images for Binge Ready shows`);
             } catch (e) {
               logger.error(`Failed to cache images for Binge Ready shows`, e);
             }
