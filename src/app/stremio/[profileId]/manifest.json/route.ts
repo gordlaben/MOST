@@ -40,7 +40,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ prof
   const { appUrl } = getAppConfig();
   const origin = appUrl || (host ? `${proto}://${host}` : new URL(request.url).origin);
 
-  const defaultSystemLists = [
+  const defaultSystemLists: CatalogDefinition[] = [
     {
       type: "series",
       id: "binge_ready",
