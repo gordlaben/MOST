@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   let sortBy = (await getSetting('FILTER_SORT_BY')) || 'newest';
   let sortPreferences: Record<string, string> = {};
   let dateFormat = (await getSetting('DATE_FORMAT')) || 'mdy';
+  let geminiModel = (await getSetting('GEMINI_MODEL')) || '';
   let selectedLists: unknown[] = [];
 
   if (profileId) {
@@ -31,6 +32,7 @@ export async function GET(request: Request) {
         sortBy = filters.sortBy || 'newest';
         sortPreferences = filters.sortPreferences || {};
         if (filters.dateFormat) dateFormat = filters.dateFormat;
+        if (filters.geminiModel) geminiModel = filters.geminiModel;
       }
       if (profile.selectedLists) {
         selectedLists = JSON.parse(profile.selectedLists);
@@ -57,7 +59,8 @@ export async function GET(request: Request) {
       includeReturning,
       sortBy,
       sortPreferences,
-      dateFormat
+      dateFormat,
+      geminiModel
     },
     selectedLists
   });
@@ -76,7 +79,8 @@ export async function POST(request: Request) {
       FILTER_INCLUDE_RETURNING, 
       FILTER_SORT_BY,
         listId,
-        DATE_FORMAT
+        DATE_FORMAT,
+        GEMINI_MODEL
   } = body;
 
   // Note: Trakt Client ID and Secret are no longer saved via API.
@@ -121,6 +125,10 @@ export async function POST(request: Request) {
       currentFilters.dateFormat = DATE_FORMAT;
     }
 
+    if (GEMINI_MODEL !== undefined) {
+      currentFilters.geminiModel = GEMINI_MODEL;
+    }
+
     updateData.filters = JSON.stringify(currentFilters);
 
     await prisma.profile.update({
@@ -140,6 +148,7 @@ export async function POST(request: Request) {
       if (filters.includeReturning !== undefined) await setSetting('FILTER_INCLUDE_RETURNING', String(filters.includeReturning));
       if (filters.sortBy !== undefined) await setSetting('FILTER_SORT_BY', filters.sortBy);
       if (filters.dateFormat !== undefined) await setSetting('DATE_FORMAT', filters.dateFormat);
+      if (filters.geminiModel !== undefined) await setSetting('GEMINI_MODEL', filters.geminiModel);
     }
 
     // Handle flat filter keys (sent from dashboard "Save as Default")
@@ -149,6 +158,7 @@ export async function POST(request: Request) {
     
     if (FILTER_SORT_BY !== undefined && !listId) await setSetting('FILTER_SORT_BY', FILTER_SORT_BY);
     if (DATE_FORMAT !== undefined) await setSetting('DATE_FORMAT', DATE_FORMAT);
+    if (GEMINI_MODEL !== undefined) await setSetting('GEMINI_MODEL', GEMINI_MODEL);
   }
 
   return NextResponse.json({ success: true });

@@ -6,6 +6,19 @@ import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
 import { aiSearch } from '@/lib/ai-search';
 
+function inferSearchType(query: string): 'movie' | 'show' | undefined {
+  const q = query.toLowerCase();
+  if (/(\bmovie\b|\bmovies\b|\bfilm\b|\bfilms\b)/.test(q)) return 'movie';
+  if (/(\bshow\b|\bshows\b|\btv\b|\bseries\b)/.test(q)) return 'show';
+  return undefined;
+}
+
+function matchesType(result: unknown, type: 'movie' | 'show') {
+  if (!result || typeof result !== 'object') return false;
+  const typed = result as { movie?: unknown; show?: unknown };
+  return type === 'movie' ? !!typed.movie : !!typed.show;
+}
+
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/trakt/search');
   const timing = createServerTiming();
@@ -55,16 +68,25 @@ export async function GET(request: NextRequest) {
       accessToken
     );
 
-    const ai = await aiSearch(query, trakt, profileId || undefined);
+    const inferredType = inferSearchType(query);
+    const ai = await aiSearch(query, trakt, profileId || undefined, inferredType);
     let results = ai.results;
 
     if (!results || results.length === 0) {
       // Search both movies and shows (fallback)
-      const [movieResults, showResults] = await Promise.all([
-        trakt.search(query, 'movie'),
-        trakt.search(query, 'show')
-      ]);
-      results = [...(movieResults || []), ...(showResults || [])];
+      if (inferredType) {
+        results = await trakt.search(query, inferredType);
+      } else {
+        const [movieResults, showResults] = await Promise.all([
+          trakt.search(query, 'movie'),
+          trakt.search(query, 'show')
+        ]);
+        results = [...(movieResults || []), ...(showResults || [])];
+      }
+    }
+
+    if (inferredType) {
+      results = (results || []).filter((item) => matchesType(item, inferredType));
     }
 
     const response = NextResponse.json({ results });

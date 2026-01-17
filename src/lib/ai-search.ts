@@ -15,7 +15,9 @@ type TraktSearchResult = { movie?: { ids?: TraktIds }; show?: { ids?: TraktIds }
 
 async function getGeminiKey(profileId?: string): Promise<string | null> {
   if (profileId) {
-    const profile = await prisma.profile.findUnique({ where: { id: profileId } });
+    const profile = (await prisma.profile.findUnique({ where: { id: profileId } })) as
+      | { geminiKey?: string | null }
+      | null;
     if (profile?.geminiKey) return profile.geminiKey;
   }
 
@@ -25,11 +27,40 @@ async function getGeminiKey(profileId?: string): Promise<string | null> {
   return settingKey || null;
 }
 
-async function callGemini(query: string, apiKey: string): Promise<AISearchItem[]> {
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+async function getGeminiModel(profileId?: string): Promise<string | null> {
+  if (profileId) {
+    const profile = (await prisma.profile.findUnique({ where: { id: profileId } })) as
+      | { filters?: string | null }
+      | null;
+    if (profile?.filters) {
+      try {
+        const filters = JSON.parse(profile.filters) as { geminiModel?: string };
+        if (filters.geminiModel) return filters.geminiModel;
+      } catch {
+        // ignore invalid filters
+      }
+    }
+  }
 
-  const prompt = `You are a media search assistant. Convert the user query into a JSON array of up to 12 items with fields: type ('movie'|'show'), title, year (optional).
+  if (process.env.GEMINI_MODEL) return process.env.GEMINI_MODEL;
+
+  const settingModel = await getSetting('GEMINI_MODEL');
+  return settingModel || null;
+}
+
+async function callGemini(
+  query: string,
+  apiKey: string,
+  type?: 'movie' | 'show',
+  modelOverride?: string | null
+): Promise<AISearchItem[]> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
+  const model = genAI.getGenerativeModel({ model: modelName });
+
+  const typeLine = type ? `Only return items of type '${type}'.` : 'Return both movies and shows only if clearly relevant.';
+  const prompt = `You are a media search assistant. Convert the user query into a JSON array of up to 20 items with fields: type ('movie'|'show'), title, year (optional).
+${typeLine}
 Return ONLY valid JSON. No markdown.
 Query: ${query}`;
 
@@ -41,7 +72,7 @@ Query: ${query}`;
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => item && (item.type === 'movie' || item.type === 'show') && typeof item.title === 'string')
-      .slice(0, 12);
+      .slice(0, 20);
   } catch (e) {
     logger.warn('Gemini returned non-JSON response', e);
     return [];
@@ -60,7 +91,8 @@ export async function aiSearch(
   }
 
   try {
-    const items = await callGemini(query, apiKey);
+    const model = await getGeminiModel(profileId);
+    const items = await callGemini(query, apiKey, type, model);
     const filtered = type ? items.filter((item) => item.type === type) : items;
     if (filtered.length === 0) {
       return { results: [], usedAI: true };

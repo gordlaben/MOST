@@ -13,6 +13,9 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
   const [clientId, setClientId] = useState('');
   const [rpdbKey, setRpdbKey] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
+  const [geminiModel, setGeminiModel] = useState('');
+  const [geminiModels, setGeminiModels] = useState<string[]>([]);
+  const [loadingGeminiModels, setLoadingGeminiModels] = useState(false);
   const [dateFormat, setDateFormat] = useState<DateFormat>('mdy');
   const [lists, setLists] = useState<DashboardList[]>([]);
   const [overwriteExisting, setOverwriteExisting] = useState(false);
@@ -61,6 +64,21 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
       .catch(console.error);
   }, [profileId]);
 
+  const fetchGeminiModels = useCallback(async () => {
+    const query = profileId ? `?profileId=${profileId}` : '';
+    setLoadingGeminiModels(true);
+    try {
+      const res = await fetch(`/api/settings/gemini-models${query}`);
+      const data = await res.json();
+      const models = Array.isArray(data.models) ? data.models.map((m: { name: string }) => m.name) : [];
+      setGeminiModels(models);
+    } catch {
+      setGeminiModels([]);
+    } finally {
+      setLoadingGeminiModels(false);
+    }
+  }, [profileId]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin);
@@ -76,12 +94,14 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
         setGeminiKey(data.geminiKey || '');
         setLists(data.selectedLists || []);
         setDateFormat(data.filters?.dateFormat || 'mdy');
+        setGeminiModel(data.filters?.geminiModel || '');
         setLoading(false);
       });
       
     fetchStats();
     fetchCacheStats();
-  }, [profileId, fetchStats, fetchCacheStats]);
+    fetchGeminiModels();
+  }, [profileId, fetchStats, fetchCacheStats, fetchGeminiModels]);
 
   const handleRefreshLists = async () => {
     setRefreshing(true);
@@ -165,7 +185,8 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
           rpdbKey,
           geminiKey,
           selectedLists: listsToSave,
-          DATE_FORMAT: dateFormat
+          DATE_FORMAT: dateFormat,
+          GEMINI_MODEL: geminiModel
         }),
       });
       setMessage('Settings saved successfully!');
@@ -521,6 +542,37 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
             <p className="text-xs text-gray-500 mt-2">
               Used for semantic search (e.g., “Best 90s movies”). Leave empty to disable AI search.
             </p>
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-400">
+                  Gemini Model
+                </label>
+                <button
+                  type="button"
+                  onClick={fetchGeminiModels}
+                  disabled={loadingGeminiModels}
+                  className="text-xs text-blue-400 hover:underline disabled:text-gray-500"
+                >
+                  {loadingGeminiModels ? 'Loading…' : 'Refresh models'}
+                </button>
+              </div>
+              <select
+                value={geminiModel}
+                onChange={(e) => setGeminiModel(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-4 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+              >
+                <option value="">Auto (gemini-flash-latest)</option>
+                {geminiModel && !geminiModels.includes(geminiModel) && (
+                  <option value={geminiModel}>{geminiModel}</option>
+                )}
+                {geminiModels.map((model) => (
+                  <option key={model} value={model}>{model}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                Model list is loaded from your Gemini API key.
+              </p>
+            </div>
             <p className={`text-xs mt-2 ${geminiKey ? 'text-green-400' : 'text-gray-500'}`}>
               AI search is {geminiKey ? 'enabled' : 'disabled'}.
             </p>
