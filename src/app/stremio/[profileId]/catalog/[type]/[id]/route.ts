@@ -16,6 +16,15 @@ interface SelectedList {
   };
 }
 
+function shuffleItems<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ profileId: string; type: string; id: string }> }
@@ -178,6 +187,10 @@ export async function GET(
           if ('movie' in item && item.movie) return type === 'movie';
           return false;
       });
+  }
+
+  if (finalFilters.sortBy === 'random') {
+    items = shuffleItems(items);
   }
 
     // Map to Stremio format
