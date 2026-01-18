@@ -16,6 +16,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dateFormat, setDateFormat] = useState<DateFormat>('mdy');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const storedPassword = sessionStorage.getItem('adminPassword');
@@ -108,15 +109,18 @@ export default function AdminPage() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-gray-800 p-8 rounded-xl border border-gray-700 shadow-2xl">
-          <h1 className="text-2xl font-bold mb-6 text-center">Admin Access</h1>
+        <div className="max-w-md w-full bg-gray-900/60 p-8 rounded-2xl border border-gray-800/80 shadow-2xl shadow-black/30">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold">Admin Access</h1>
+            <p className="text-sm text-gray-500 mt-2">Sign in to manage profiles.</p>
+          </div>
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
+                className="w-full bg-gray-950/70 border border-gray-800/80 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/30 outline-none transition-colors"
                 placeholder="Enter Admin Password"
                 autoFocus
               />
@@ -125,7 +129,7 @@ export default function AdminPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-bold transition-colors disabled:opacity-50"
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold transition-colors disabled:opacity-50"
             >
               {loading ? 'Verifying...' : 'Login'}
             </button>
@@ -135,24 +139,72 @@ export default function AdminPage() {
     );
   }
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const filteredProfiles = profiles.filter((profile) => {
+    if (!normalizedQuery) return true;
+    const createdAtText = formatDate(profile.createdAt, dateFormat) || profile.createdAt;
+    return [
+      profile.id,
+      profile.username,
+      createdAtText
+    ].some((value) => value?.toLowerCase().includes(normalizedQuery));
+  });
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+            <p className="text-sm text-gray-500 mt-1">Manage profiles and access configuration links.</p>
+          </div>
           <button
             onClick={() => {
               setIsAuthenticated(false);
               setPassword('');
               sessionStorage.removeItem('adminPassword');
             }}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            className="px-4 py-2 bg-gray-900/70 border border-gray-800/80 hover:bg-gray-800 rounded-xl transition-colors"
           >
             Logout
           </button>
         </div>
 
-        <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-gray-900/60 p-5 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
+            <p className="text-xs uppercase tracking-wider text-gray-500">Total Profiles</p>
+            <p className="text-2xl font-bold text-white mt-2">{profiles.length}</p>
+          </div>
+          <div className="bg-gray-900/60 p-5 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
+            <p className="text-xs uppercase tracking-wider text-gray-500">Connected to Trakt</p>
+            <p className="text-2xl font-bold text-emerald-300 mt-2">
+              {profiles.filter((p) => p.username !== 'Not Connected').length}
+            </p>
+          </div>
+          <div className="bg-gray-900/60 p-5 rounded-2xl border border-gray-800/80 shadow-lg shadow-black/20">
+            <p className="text-xs uppercase tracking-wider text-gray-500">Not Connected</p>
+            <p className="text-2xl font-bold text-gray-300 mt-2">
+              {profiles.filter((p) => p.username === 'Not Connected').length}
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-gray-900/60 rounded-2xl border border-gray-800/80 overflow-hidden shadow-lg shadow-black/20">
+          <div className="p-5 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-purple-300">Profiles</h2>
+              <p className="text-xs text-gray-500 mt-1">Search by Profile ID</p>
+            </div>
+            <div className="w-full md:w-80">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search profiles..."
+                className="w-full bg-gray-950/70 border border-gray-800/80 rounded-xl px-4 py-2.5 text-white placeholder:text-gray-600 focus:border-purple-500/60 focus:ring-2 focus:ring-purple-500/30 outline-none transition-colors"
+              />
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-gray-900/50 text-gray-400 uppercase text-xs">
@@ -163,9 +215,9 @@ export default function AdminPage() {
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
-                {profiles.map((profile) => (
-                  <tr key={profile.id} className="hover:bg-gray-700/50 transition-colors">
+              <tbody className="divide-y divide-gray-800/80">
+                {filteredProfiles.map((profile) => (
+                  <tr key={profile.id} className="hover:bg-gray-800/60 transition-colors">
                     <td className="px-6 py-4 font-mono text-sm">{profile.id}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -196,7 +248,7 @@ export default function AdminPage() {
                     </td>
                   </tr>
                 ))}
-                {profiles.length === 0 && (
+                {filteredProfiles.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
                       No profiles found.
