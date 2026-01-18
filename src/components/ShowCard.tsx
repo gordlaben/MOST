@@ -37,6 +37,16 @@ export default function ShowCard({
 
   const isMovie = !!item.movie;
   const totalEpisodes = item.totalEpisodes || content.aired_episodes;
+  const isMovieWatched = isMovie && item.isWatched === true;
+  const hasWatchedProgress = (isSystemList && typeof item.watchedEpisodes === 'number' && item.watchedEpisodes > 0) || isMovieWatched;
+  const isWatching = !isMovie && hasWatchedProgress && totalEpisodes && item.watchedEpisodes < totalEpisodes;
+  const watchedBadgeLabel = isWatching ? 'Watching' : 'Watched';
+  const watchedBadgeStyle = watchedBadgeLabel === 'Watching'
+    ? 'bg-amber-900/80 text-amber-200 border-amber-700/50 ring-1 ring-amber-500/40'
+    : 'bg-green-900/80 text-green-200 border-green-700/50 ring-1 ring-green-500/40';
+  const watchedBadgeStyleMuted = watchedBadgeLabel === 'Watching'
+    ? 'bg-amber-900/50 text-amber-200 border-amber-700/50 ring-1 ring-amber-500/30'
+    : 'bg-green-900/50 text-green-200 border-green-700/50 ring-1 ring-green-500/30';
   
   let posterUrl = null;
   if (content.images?.poster) {
@@ -140,6 +150,12 @@ export default function ShowCard({
                         {content.status}
                     </div>
                 )}
+
+                {hasWatchedProgress && (
+                  <div className={`px-1.5 py-0.5 rounded text-[10px] font-bold backdrop-blur-sm shadow-lg border uppercase ${watchedBadgeStyle}`}>
+                    {watchedBadgeLabel}
+                  </div>
+                )}
             </div>
           )}
           {variant === 'vertical' && content.rating && (
@@ -203,6 +219,12 @@ export default function ShowCard({
             {variant === 'horizontal' && (
               <span className={'px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ' + (isMovie ? 'bg-blue-900/50 text-blue-200 border border-blue-700/50' : 'bg-purple-900/50 text-purple-200 border border-purple-700/50')}>
                 {isMovie ? 'Movie' : 'Series'}
+              </span>
+            )}
+
+            {variant === 'horizontal' && hasWatchedProgress && (
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${watchedBadgeStyleMuted}`}>
+                {watchedBadgeLabel}
               </span>
             )}
             
