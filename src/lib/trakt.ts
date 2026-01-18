@@ -124,6 +124,7 @@ export interface TraktListItem {
   movie?: TraktMovie;
   season?: { number: number };
   episode?: { season: number; number: number };
+  isWatched?: boolean;
 }
 
 
@@ -155,6 +156,13 @@ export interface TraktWatchedShow {
   last_updated_at: string;
   show: TraktShow;
   seasons: TraktWatchedSeason[];
+}
+
+export interface TraktWatchedMovie {
+  plays: number;
+  last_watched_at: string;
+  last_updated_at: string;
+  movie: TraktMovie;
 }
 
 export interface TraktBingeReadyShow {
@@ -602,7 +610,10 @@ export class TraktClient {
                 let data = JSON.parse(cached.data);
                 if (filters) data = this.filterListItems(data, filters);
                 data = this.sortListItems(data, sortBy);
-                if (limit && Array.isArray(data)) return data.slice(0, limit);
+              if (Array.isArray(data)) {
+                data = await this.applyWatchedFlagsToListItems(data);
+                if (limit) return data.slice(0, limit);
+              }
                 return data;
             } catch { /* ignore */ }
         }
@@ -623,6 +634,9 @@ export class TraktClient {
                      let data = JSON.parse(cachedPreview.data);
                      if (filters) data = this.filterListItems(data, filters);
                      data = this.sortListItems(data, sortBy);
+                   if (Array.isArray(data)) {
+                    data = await this.applyWatchedFlagsToListItems(data);
+                   }
                      return data.slice(0, limit);
                  } catch { /* ignore */ }
              }
@@ -637,6 +651,9 @@ export class TraktClient {
     let processed = data;
     if (filters) processed = this.filterListItems(processed, filters);
     processed = this.sortListItems(processed, sortBy);
+    if (Array.isArray(processed)) {
+      processed = await this.applyWatchedFlagsToListItems(processed);
+    }
     
     if (limit && Array.isArray(processed)) {
         return processed.slice(0, limit);
@@ -694,6 +711,30 @@ export class TraktClient {
       }
       return data;
   }
+
+      private async applyWatchedFlagsToListItems(items: TraktListItem[]): Promise<TraktListItem[]> {
+        const hasMovies = items.some(item => !!item.movie);
+        if (!hasMovies) return items;
+
+        try {
+          const watchedMovies = await this.getWatchedMoviesRaw();
+          const watchedMovieIds = new Set(
+            watchedMovies
+              .map(entry => entry.movie?.ids?.trakt)
+              .filter((id): id is number => typeof id === 'number')
+          );
+
+          return items.map(item => {
+            if (!item.movie) return item;
+            const traktId = item.movie.ids?.trakt;
+            if (typeof traktId !== 'number') return item;
+            return { ...item, isWatched: watchedMovieIds.has(traktId) };
+          });
+        } catch (error) {
+          logger.warn('Failed to apply watched flags to list items', error);
+          return items;
+        }
+      }
   
   async syncListItemsToDb(traktListId: string, items: TraktListItem[]) {
       if (!this.profileId) return;
@@ -1233,6 +1274,52 @@ export class TraktClient {
         logger.error('Failed to fetch watched shows', error);
         throw error;
       }
+  }
+
+  async getWatchedMoviesRaw(forceRefresh = false): Promise<TraktWatchedMovie[]> {
+    logger.debug('Fetching watched movies raw');
+    const cacheKey = `watched-movies-${this.profileId}`;
+
+    if (this.profileId && !forceRefresh) {
+      const cached = await prisma.calendarCache.findUnique({ where: { id: cacheKey } });
+
+      if (cached) {
+        const isStale = Date.now() - cached.updatedAt.getTime() > 15 * 60 * 1000;
+
+        if (isStale) {
+          logger.debug('Cache stale, triggering background refresh for watched movies');
+          this.fetchAndCacheWatchedMovies().catch(err => logger.error('Background watched movies refresh failed', err));
+        }
+
+        try {
+          return JSON.parse(cached.data);
+        } catch {
+          // If parse fails, fall through to fetch
+        }
+      }
+    }
+
+    return this.fetchAndCacheWatchedMovies();
+  }
+
+  private async fetchAndCacheWatchedMovies(): Promise<TraktWatchedMovie[]> {
+    try {
+      const data = await this.request<TraktWatchedMovie[]>('get', `${TRAKT_API_URL}/sync/watched/movies?extended=full,images`);
+
+      if (this.profileId) {
+        const cacheKey = `watched-movies-${this.profileId}`;
+        prisma.calendarCache.upsert({
+          where: { id: cacheKey },
+          update: { data: JSON.stringify(data), updatedAt: new Date() },
+          create: { id: cacheKey, data: JSON.stringify(data), updatedAt: new Date() }
+        }).catch(err => logger.error('Failed to cache watched movies', err));
+      }
+
+      return data;
+    } catch (error) {
+      logger.error('Failed to fetch watched movies', error);
+      throw error;
+    }
   }
 
   async getUserWatching(): Promise<TraktShow[]> {
