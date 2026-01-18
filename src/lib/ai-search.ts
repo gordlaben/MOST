@@ -75,7 +75,7 @@ async function callGemini(
   limit = 20
 ): Promise<AISearchItem[]> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
+  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite').replace(/^models\//, '');
   const model = genAI.getGenerativeModel({
     model: modelName,
     generationConfig: { responseMimeType: 'application/json' }
@@ -124,7 +124,7 @@ async function callGeminiListName(
   size?: number
 ): Promise<string | null> {
   const genAI = new GoogleGenerativeAI(apiKey);
-  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-flash-latest').replace(/^models\//, '');
+  const modelName = (modelOverride || process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite').replace(/^models\//, '');
   const model = genAI.getGenerativeModel({ model: modelName });
 
   const typeLabel = type ? (type === 'movie' ? 'movies' : 'series') : 'titles';

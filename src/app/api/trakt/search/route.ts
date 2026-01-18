@@ -19,6 +19,38 @@ function matchesType(result: unknown, type: 'movie' | 'show') {
   return type === 'movie' ? !!typed.movie : !!typed.show;
 }
 
+function getResultTitle(result: unknown) {
+  if (!result || typeof result !== 'object') return '';
+  const typed = result as { movie?: { title?: string }; show?: { title?: string }; title?: string };
+  return typed.movie?.title || typed.show?.title || typed.title || '';
+}
+
+function getResultKey(result: unknown) {
+  if (!result || typeof result !== 'object') return null;
+  const typed = result as { movie?: { ids?: { trakt?: number; imdb?: string; tmdb?: number } }; show?: { ids?: { trakt?: number; imdb?: string; tmdb?: number } }; ids?: { trakt?: number; imdb?: string; tmdb?: number } };
+  const content = typed.movie || typed.show || typed;
+  const ids = content?.ids;
+  if (!ids) return null;
+  if (ids.trakt) return `trakt:${ids.trakt}`;
+  if (ids.imdb) return `imdb:${ids.imdb}`;
+  if (ids.tmdb) return `tmdb:${ids.tmdb}`;
+  return null;
+}
+
+function mergeResults(results: unknown[]) {
+  const merged: unknown[] = [];
+  const seen = new Set<string>();
+
+  for (const result of results) {
+    const key = getResultKey(result);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(result);
+  }
+
+  return merged;
+}
+
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/trakt/search');
   const timing = createServerTiming();
@@ -69,19 +101,40 @@ export async function GET(request: NextRequest) {
     );
 
     const inferredType = inferSearchType(query);
-    const ai = await aiSearch(query, trakt, profileId || undefined, inferredType);
-    let results = ai.results;
+    const normalizedQuery = query.trim().toLowerCase();
 
-    if (!results || results.length === 0) {
-      // Search both movies and shows (fallback)
-      if (inferredType) {
-        results = await trakt.search(query, inferredType);
-      } else {
-        const [movieResults, showResults] = await Promise.all([
-          trakt.search(query, 'movie'),
-          trakt.search(query, 'show')
-        ]);
-        results = [...(movieResults || []), ...(showResults || [])];
+    let traktResults: unknown[] = [];
+    if (inferredType) {
+      traktResults = await trakt.search(query, inferredType);
+    } else {
+      const [movieResults, showResults] = await Promise.all([
+        trakt.search(query, 'movie'),
+        trakt.search(query, 'show')
+      ]);
+      traktResults = [...(movieResults || []), ...(showResults || [])];
+    }
+
+    const hasExactMatch = traktResults.some((item) =>
+      getResultTitle(item).toLowerCase() === normalizedQuery
+    );
+
+    let results = traktResults;
+
+    if (!hasExactMatch) {
+      const ai = await aiSearch(query, trakt, profileId || undefined, inferredType);
+      const aiResults = ai.results || [];
+
+      if (aiResults.length > 0) {
+        if (!inferredType) {
+          const hasMovie = aiResults.some((item) => matchesType(item, 'movie'));
+          const hasShow = aiResults.some((item) => matchesType(item, 'show'));
+          const supplemental = traktResults.filter((item) =>
+            (hasMovie ? false : matchesType(item, 'movie')) || (hasShow ? false : matchesType(item, 'show'))
+          );
+          results = mergeResults([...aiResults, ...supplemental]);
+        } else {
+          results = aiResults;
+        }
       }
     }
 

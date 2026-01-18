@@ -98,7 +98,7 @@ services:
 
       # Optional: Gemini AI semantic search
       - GEMINI_API_KEY=your_gemini_key
-      - GEMINI_MODEL=gemini-flash-latest
+      - GEMINI_MODEL=gemini-2.5-flash-lite
       
       # Required: Your public URL for Stremio/Calendar links
       - NEXT_PUBLIC_BASE_URL=http://localhost:3000
@@ -171,7 +171,7 @@ You can configure Most using environment variables in your `docker-compose.yml` 
 | `TRAKT_CLIENT_ID` | Your Trakt.tv Application Client ID. | - |
 | `TRAKT_CLIENT_SECRET` | Your Trakt.tv Application Client Secret. | - |
 | `GEMINI_API_KEY` | (Optional) Gemini API key for semantic search. | - |
-| `GEMINI_MODEL` | (Optional) Gemini model to use. | `gemini-flash-latest` |
+| `GEMINI_MODEL` | (Optional) Gemini model to use. | `gemini-2.5-flash-lite` |
 | `ADMIN_PASSWORD` | (Optional) Password for accessing the `/admin` dashboard to manage users. | - |
 | `ENABLE_REGISTRATION` | Set to `false` to disable the "Create Profile" form. Useful for private instances. | `true` |
 

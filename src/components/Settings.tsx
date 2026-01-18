@@ -148,6 +148,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     }
   }, [profileId]);
 
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin);
@@ -286,6 +287,7 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
     }, 700);
     return () => clearTimeout(timer);
   }, [profileId, rpdbKey, geminiKey, geminiModel, dateFormat]);
+
   
   const handleExport = () => {
     const customLists = lists.filter(l => l.type === 'custom' || l.type === 'ai');
@@ -643,9 +645,9 @@ export default function Settings({ profileId: propProfileId }: SettingsProps) {
               <CustomSelect
                 value={geminiModel}
                 onChange={setGeminiModel}
-                placeholder="Auto (gemini-flash-latest)"
+                placeholder="Auto (gemini-2.5-flash-lite)"
                 options={[
-                  { value: '', label: 'Auto (gemini-flash-latest)' },
+                  { value: '', label: 'Auto (gemini-2.5-flash-lite)' },
                   ...(geminiModel && !geminiModels.includes(geminiModel)
                     ? [{ value: geminiModel, label: geminiModel }]
                     : []),
