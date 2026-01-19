@@ -68,14 +68,44 @@ export async function GET(request: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        let closed = false;
+        const isAborted = () => request.signal.aborted;
+        const safeEnqueue = (data: string) => {
+          if (closed || isAborted()) {
+            return;
+          }
+          try {
+            controller.enqueue(encoder.encode(data));
+          } catch {
+            // Controller closed (client hung up), ignore
+          }
+        };
+        const safeClose = () => {
+          if (closed) {
+            return;
+          }
+          closed = true;
+          try {
+            controller.close();
+          } catch {
+            // Ignore double-close
+          }
+        };
+        const safeError = (error: unknown) => {
+          if (closed || isAborted()) {
+            return;
+          }
+          closed = true;
+          try {
+            controller.error(error);
+          } catch {
+            // Ignore if already closed
+          }
+        };
         try {
           const shows = await trakt.getEpisodesLeftShows((message, current, total) => {
              const progress = { type: 'progress', message, current, total };
-             try {
-                controller.enqueue(encoder.encode(JSON.stringify(progress) + '\n'));
-             } catch {
-                // Controller closed (client hung up), ignore
-             }
+             safeEnqueue(JSON.stringify(progress) + '\n');
           }, { ...filters, forceRefresh });
           
           // Calculate API Stats
@@ -83,7 +113,7 @@ export async function GET(request: NextRequest) {
           const minIntervalMinutes = Math.ceil(Math.max(15, (calls / 900) * 5));
           
           const stats = { type: 'stats', calls, minIntervalMinutes };
-          controller.enqueue(encoder.encode(JSON.stringify(stats) + '\n'));
+          safeEnqueue(JSON.stringify(stats) + '\n');
 
           // Update cache
           await prisma.calendarCache.upsert({
@@ -129,11 +159,11 @@ export async function GET(request: NextRequest) {
           })();
 
           const result = { type: 'result', data: shows };
-          controller.enqueue(encoder.encode(JSON.stringify(result) + '\n'));
-          controller.close();
+          safeEnqueue(JSON.stringify(result) + '\n');
+          safeClose();
         } catch (e) {
           console.error('Error in stream:', e);
-          controller.error(e);
+          safeError(e);
         }
       }
     });
