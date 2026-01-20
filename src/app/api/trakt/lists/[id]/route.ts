@@ -44,13 +44,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const trakt = new TraktClient(clientId || '', clientSecret || '', '', accessToken);
 
-    const details = await trakt.getListDetails('me', id);
-    const typed = details as { description?: string; privacy?: string } | null;
+    let resolvedListId = id;
+    let description = '';
+    let privacy = 'private';
 
-    const description = typed?.description || '';
-    const privacy = typed?.privacy || 'private';
+    try {
+      const details = await trakt.getListDetails('me', id);
+      const typed = details as { description?: string; privacy?: string } | null;
+      description = typed?.description || '';
+      privacy = typed?.privacy || 'private';
+    } catch (error: unknown) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 400 || status === 404) {
+        const lists = await trakt.getUserLists(true);
+        const match = Array.isArray(lists)
+          ? lists.find((list) => list?.ids?.slug === id || String(list?.ids?.trakt) === id)
+          : null;
 
-    const list = await trakt.updateList(id, name, description, privacy);
+        if (!match?.ids?.slug) {
+          const response = NextResponse.json({ error: 'List not found on Trakt' }, { status: 404 });
+          timing.appendTo(response, 'trakt_list_update');
+          ctx.end(response.status);
+          return response;
+        }
+
+        resolvedListId = match.ids.slug;
+        description = match.description || '';
+        privacy = match.privacy || 'private';
+      } else {
+        throw error;
+      }
+    }
+
+    const list = await trakt.updateList(resolvedListId, name, description, privacy);
 
     const response = NextResponse.json(list);
     timing.appendTo(response, 'trakt_list_update');

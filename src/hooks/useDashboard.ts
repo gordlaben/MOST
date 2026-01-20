@@ -861,18 +861,6 @@ export function useDashboard({ profileId: propProfileId }: DashboardProps) {
 
     setLoadingLists(true);
     try {
-      const res = await fetch(`/api/trakt/lists/${listId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId, name: newName })
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        addToast(err.error || 'Failed to rename list', 'error');
-        return;
-      }
-
       const newLists = selectedLists.map(l => {
         if (l.id === listId) {
           return { ...l, name: newName };
