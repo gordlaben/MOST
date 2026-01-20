@@ -931,7 +931,23 @@ export class TraktClient {
         }
       }
 
-      return [...items].sort((a, b) => {
+        const now = Date.now();
+        const maxFutureMs = 1000 * 60 * 60 * 24 * 365; // 1 year
+
+        const getSortableDate = (item: any) => {
+        const primaryDateStr = item.show?.first_aired || item.movie?.released || item.season?.first_aired || item.episode?.first_aired || '';
+        const primaryDate = new Date(primaryDateStr).getTime();
+
+        if (Number.isFinite(primaryDate) && primaryDate <= now + maxFutureMs) {
+          return primaryDate;
+        }
+
+        const fallbackStr = item.listed_at || item.added_at || item.updated_at || '1970-01-01';
+        const fallbackDate = new Date(fallbackStr).getTime();
+        return Number.isFinite(fallbackDate) ? fallbackDate : 0;
+        };
+
+        return [...items].sort((a, b) => {
           if (sortBy === 'title') {
               const titleA = (a.show?.title || a.movie?.title || '').toLowerCase();
               const titleB = (b.show?.title || b.movie?.title || '').toLowerCase();
@@ -942,10 +958,8 @@ export class TraktClient {
               return titleB.localeCompare(titleA);
           } else {
               // Newest / Oldest (based on Release Date/First Aired)
-              const dateAStr = a.show?.first_aired || a.movie?.released || a.season?.first_aired || a.episode?.first_aired || '1970-01-01';
-              const dateBStr = b.show?.first_aired || b.movie?.released || b.season?.first_aired || b.episode?.first_aired || '1970-01-01';
-              const dateA = new Date(dateAStr).getTime();
-              const dateB = new Date(dateBStr).getTime();
+            const dateA = getSortableDate(a);
+            const dateB = getSortableDate(b);
               
               if (sortBy === 'oldest') {
                   return dateA - dateB;
