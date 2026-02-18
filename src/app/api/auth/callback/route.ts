@@ -4,6 +4,7 @@ import { TraktClient } from '@/lib/trakt';
 import { createRequestContext } from '@/lib/request-logging';
 import { prisma } from '@/lib/db';
 import { getAppConfig } from '@/lib/config';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/auth/callback');
@@ -14,8 +15,7 @@ export async function GET(request: NextRequest) {
   if (!code) {
     ctx.log.warn('Auth callback received without code');
     const response = NextResponse.json({ error: 'No code provided' }, { status: 400 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   ctx.log.info('Received auth callback with code');
@@ -25,8 +25,7 @@ export async function GET(request: NextRequest) {
   if (!clientId || !clientSecret) {
     ctx.log.error('Trakt credentials missing during callback');
     const response = NextResponse.json({ error: 'Trakt credentials not configured' }, { status: 400 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   const { nextPublicBaseUrl } = getAppConfig();
@@ -58,8 +57,7 @@ export async function GET(request: NextRequest) {
       });
 
       const response = NextResponse.redirect(new URL(`/stremio/${profileId}/configure?connected=true`, baseUrl));
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx });
     } else {
       // Global auth (legacy)
       await setSetting('TRAKT_ACCESS_TOKEN', tokenData.access_token);
@@ -68,13 +66,11 @@ export async function GET(request: NextRequest) {
 
       ctx.log.info('Successfully exchanged token and saved to global settings');
       const response = NextResponse.redirect(new URL('/?connected=true', baseUrl));
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx });
     }
   } catch (error) {
     ctx.log.error('Error exchanging token:', error);
     const response = NextResponse.json({ error: 'Failed to exchange token' }, { status: 500 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 }

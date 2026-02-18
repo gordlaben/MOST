@@ -4,6 +4,8 @@ import { getTraktCredentials } from '@/lib/settings';
 import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
+import { validateQuery } from '@/lib/request-validation';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 export async function GET(request: Request) {
   const ctx = createRequestContext(request, 'api/trakt/list-items');
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
     includeReturning: z.enum(['true', 'false']).optional()
   });
 
-  const parsed = querySchema.safeParse({
+  const parsed = validateQuery(querySchema, {
     profileId,
     listId,
     username,
@@ -45,10 +47,7 @@ export async function GET(request: Request) {
   });
 
   if (!parsed.success) {
-    const response = NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
-    timing.appendTo(response, 'trakt_list_items');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(parsed.errorResponse, { ctx, timing, metricName: 'trakt_list_items' });
   }
 
   const limit = limitParam ? parseInt(limitParam, 10) : undefined;
@@ -62,9 +61,7 @@ export async function GET(request: Request) {
 
   if (!profileId || !listId) {
     const response = NextResponse.json({ error: 'Missing profileId or listId' }, { status: 400 });
-    timing.appendTo(response, 'trakt_list_items');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_items' });
   }
 
   try {
@@ -72,9 +69,7 @@ export async function GET(request: Request) {
 
     if (!clientId || !clientSecret || !accessToken) {
       const response = NextResponse.json({ error: 'Missing Trakt credentials' }, { status: 401 });
-      timing.appendTo(response, 'trakt_list_items');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_items' });
     }
 
     const trakt = new TraktClient(clientId, clientSecret, '', accessToken, profileId);
@@ -97,16 +92,12 @@ export async function GET(request: Request) {
             'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300'
         }
     });
-    timing.appendTo(response, 'trakt_list_items');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_items' });
   } catch (error) {
     const duration = Date.now() - start;
     ctx.log.error(`List Load Failed: ${listId} (${duration}ms)`, error);
     const response = NextResponse.json({ error: 'Failed to fetch list items' }, { status: 500 });
-    timing.appendTo(response, 'trakt_list_items');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_items' });
   }
 }
 

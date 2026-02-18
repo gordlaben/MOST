@@ -1,30 +1,31 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { getSetting } from '@/lib/settings';
 import { z } from 'zod';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { logRouteError } from '@/lib/route-error';
+import { parseAndValidateJson } from '@/lib/request-validation';
+
+const bodySchema = z.object({
+  password: z.string().min(1)
+});
 
 export async function POST(request: Request) {
   try {
     // Check if registration is enabled
     if (process.env.ENABLE_REGISTRATION === 'false') {
-      return NextResponse.json({ error: 'Registration is disabled' }, { status: 403 });
+      return jsonError('Registration is disabled', 403);
     }
 
-    const body = await request.json();
-    const bodySchema = z.object({
-      password: z.string().min(1)
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, bodySchema);
     if (!parsedBody.success) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      return parsedBody.errorResponse;
     }
 
     const { password } = parsedBody.data;
 
     if (!password) {
-      return NextResponse.json({ error: 'Password is required' }, { status: 400 });
+      return jsonError('Password is required', 400);
     }
 
     // Fetch current global settings to copy
@@ -58,9 +59,9 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json({ id: profile.id });
+    return jsonSuccess({ id: profile.id });
   } catch (error) {
-    console.error('Error creating profile:', error);
-    return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
+    logRouteError('api/profile/create', 'Profile creation failed', error);
+    return jsonError('Failed to create profile', 500);
   }
 }

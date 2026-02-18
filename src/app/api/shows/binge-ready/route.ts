@@ -6,6 +6,7 @@ import { prefetchImages } from '@/lib/images';
 import { logger } from '@/lib/logger';
 import { createRequestContext } from '@/lib/request-logging';
 import { getAppConfig } from '@/lib/config';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/shows/binge-ready');
@@ -37,8 +38,7 @@ export async function GET(request: NextRequest) {
           const response = NextResponse.json(data, {
             headers: { 'X-Cache': 'HIT' }
           });
-          ctx.end(response.status);
-          return response;
+          return finalizeApiResponse(response, { ctx });
         } catch {
           // If JSON parse fails, ignore cache
         }
@@ -50,8 +50,7 @@ export async function GET(request: NextRequest) {
 
   if (!accessToken) {
     const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   const { traktClientId, traktClientSecret, nextPublicBaseUrl } = getAppConfig();
@@ -177,12 +176,10 @@ export async function GET(request: NextRequest) {
         'X-Cache': 'MISS'
       }
     });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   } catch (error) {
     console.error('Error fetching binge ready shows:', error);
     const response = NextResponse.json({ error: 'Failed to fetch shows' }, { status: 500 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 }

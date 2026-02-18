@@ -1,6 +1,33 @@
 import { NextResponse } from 'next/server';
 import { getSetting, setSetting, getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
+import { z } from 'zod';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { parseAndValidateJson } from '@/lib/request-validation';
+
+const filtersSchema = z.object({
+  includeEnded: z.boolean().optional(),
+  includeCanceled: z.boolean().optional(),
+  includeReturning: z.boolean().optional(),
+  sortBy: z.string().optional(),
+  dateFormat: z.enum(['mdy', 'dmy', 'ymd']).optional(),
+  geminiModel: z.string().optional(),
+}).partial();
+
+const settingsBodySchema = z.object({
+  profileId: z.string().min(1).optional(),
+  rpdbKey: z.string().optional(),
+  geminiKey: z.string().optional(),
+  filters: filtersSchema.optional(),
+  selectedLists: z.array(z.unknown()).optional(),
+  FILTER_INCLUDE_ENDED: z.union([z.string(), z.boolean()]).optional(),
+  FILTER_INCLUDE_CANCELED: z.union([z.string(), z.boolean()]).optional(),
+  FILTER_INCLUDE_RETURNING: z.union([z.string(), z.boolean()]).optional(),
+  FILTER_SORT_BY: z.string().optional(),
+  listId: z.string().optional(),
+  DATE_FORMAT: z.enum(['mdy', 'dmy', 'ymd']).optional(),
+  GEMINI_MODEL: z.string().optional(),
+});
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -67,7 +94,12 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const parsedBody = await parseAndValidateJson(request, settingsBodySchema);
+
+  if (!parsedBody.success) {
+    return parsedBody.errorResponse;
+  }
+
   const { 
       profileId, 
       rpdbKey,
@@ -81,7 +113,7 @@ export async function POST(request: Request) {
         listId,
         DATE_FORMAT,
         GEMINI_MODEL
-  } = body;
+        } = parsedBody.data;
 
   // Note: Trakt Client ID and Secret are no longer saved via API.
   // They must be set via environment variables.
@@ -90,7 +122,7 @@ export async function POST(request: Request) {
     // Update Profile
     const profile = await prisma.profile.findUnique({ where: { id: profileId } });
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      return jsonError('Profile not found', 404);
     }
 
     const updateData: { rpdbKey?: string; geminiKey?: string; selectedLists?: string; filters?: string } = {};
@@ -105,9 +137,9 @@ export async function POST(request: Request) {
       currentFilters = { ...currentFilters, ...filters };
     }
     
-    if (FILTER_INCLUDE_ENDED !== undefined) currentFilters.includeEnded = FILTER_INCLUDE_ENDED === 'true';
-    if (FILTER_INCLUDE_CANCELED !== undefined) currentFilters.includeCanceled = FILTER_INCLUDE_CANCELED === 'true';
-    if (FILTER_INCLUDE_RETURNING !== undefined) currentFilters.includeReturning = FILTER_INCLUDE_RETURNING === 'true';
+    if (FILTER_INCLUDE_ENDED !== undefined) currentFilters.includeEnded = String(FILTER_INCLUDE_ENDED) === 'true';
+    if (FILTER_INCLUDE_CANCELED !== undefined) currentFilters.includeCanceled = String(FILTER_INCLUDE_CANCELED) === 'true';
+    if (FILTER_INCLUDE_RETURNING !== undefined) currentFilters.includeReturning = String(FILTER_INCLUDE_RETURNING) === 'true';
     if (FILTER_SORT_BY !== undefined) {
         if (listId) {
             // Update specific list sort preference
@@ -161,5 +193,5 @@ export async function POST(request: Request) {
     if (GEMINI_MODEL !== undefined) await setSetting('GEMINI_MODEL', GEMINI_MODEL);
   }
 
-  return NextResponse.json({ success: true });
+  return jsonSuccess({ success: true });
 }

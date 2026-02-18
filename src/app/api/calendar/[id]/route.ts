@@ -3,11 +3,23 @@ import { getTraktCredentials } from '@/lib/settings';
 import { prisma } from '@/lib/db';
 import ical from 'ical-generator';
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { CACHE_TTL, getCalendarHeaders, isCacheFresh } from '@/lib/cache-policy';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const searchParams = request.nextUrl.searchParams;
-  const forceRefresh = searchParams.get('force') === 'true';
+  const forceParam = searchParams.get('force');
+  const querySchema = z.object({
+    force: z.enum(['true', 'false']).optional()
+  });
+
+  const parsed = querySchema.safeParse({ force: forceParam || undefined });
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
+  }
+
+  const forceRefresh = forceParam === 'true';
 
   // Check cache first
   if (!forceRefresh) {
@@ -16,15 +28,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     if (cached) {
-      const cacheAge = Date.now() - cached.updatedAt.getTime();
-      // Cache for 24 hours (daily sync)
-      if (cacheAge < 24 * 60 * 60 * 1000) {
+      if (isCacheFresh(cached.updatedAt, CACHE_TTL.calendarMs)) {
         return new NextResponse(cached.data, {
-          headers: {
-            'Content-Type': 'text/calendar; charset=utf-8',
-            'Content-Disposition': 'attachment; filename="most.ics"',
-            'X-Cache': 'HIT',
-          },
+          headers: getCalendarHeaders('HIT'),
         });
       }
     }
@@ -88,11 +94,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     });
 
     return new NextResponse(calendarData, {
-      headers: {
-        'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="most.ics"',
-        'X-Cache': 'MISS',
-      },
+      headers: getCalendarHeaders('MISS'),
     });
   } catch (error) {
     console.error('Error generating calendar:', error);
@@ -104,11 +106,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     
     if (cached) {
        return new NextResponse(cached.data, {
-          headers: {
-            'Content-Type': 'text/calendar; charset=utf-8',
-            'Content-Disposition': 'attachment; filename="most.ics"',
-            'X-Cache': 'STALE-ERROR',
-          },
+         headers: getCalendarHeaders('STALE-ERROR'),
        });
     }
 

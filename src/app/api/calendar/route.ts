@@ -7,6 +7,8 @@ import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { getAppConfig } from '@/lib/config';
 import { createServerTiming } from '@/lib/server-timing';
+import { CACHE_TTL, getCalendarHeaders, isCacheFresh } from '@/lib/cache-policy';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/calendar');
@@ -20,8 +22,7 @@ export async function GET(request: NextRequest) {
   const parsed = querySchema.safeParse({ force: forceParam || undefined });
   if (!parsed.success) {
     const response = NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   const forceRefresh = forceParam === 'true';
@@ -33,19 +34,11 @@ export async function GET(request: NextRequest) {
     });
 
     if (cached) {
-      const cacheAge = Date.now() - cached.updatedAt.getTime();
-      // Cache for 24 hours (daily sync)
-      if (cacheAge < 24 * 60 * 60 * 1000) {
+      if (isCacheFresh(cached.updatedAt, CACHE_TTL.calendarMs)) {
         const response = new NextResponse(cached.data, {
-          headers: {
-            'Content-Type': 'text/calendar; charset=utf-8',
-            'Content-Disposition': 'attachment; filename="most.ics"',
-            'X-Cache': 'HIT',
-          },
+          headers: getCalendarHeaders('HIT'),
         });
-        timing.appendTo(response, 'calendar');
-        ctx.end(response.status);
-        return response;
+        return finalizeApiResponse(response, { ctx, timing, metricName: 'calendar' });
       }
     }
   }
@@ -110,15 +103,9 @@ export async function GET(request: NextRequest) {
     });
 
     const response = new NextResponse(calendarData, {
-      headers: {
-        'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': 'attachment; filename="most.ics"',
-        'X-Cache': 'MISS',
-      },
+      headers: getCalendarHeaders('MISS'),
     });
-    timing.appendTo(response, 'calendar');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'calendar' });
   } catch (error) {
      console.error('Error generating calendar:', error);
     
@@ -129,20 +116,12 @@ export async function GET(request: NextRequest) {
      
      if (cached) {
         const response = new NextResponse(cached.data, {
-           headers: {
-             'Content-Type': 'text/calendar; charset=utf-8',
-             'Content-Disposition': 'attachment; filename="most.ics"',
-             'X-Cache': 'STALE-ERROR',
-           },
+            headers: getCalendarHeaders('STALE-ERROR'),
         });
-          timing.appendTo(response, 'calendar');
-          ctx.end(response.status);
-        return response;
+        return finalizeApiResponse(response, { ctx, timing, metricName: 'calendar' });
      }
 
       const response = new NextResponse('Error generating calendar', { status: 500 });
-        timing.appendTo(response, 'calendar');
-        ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'calendar' });
   }
 }

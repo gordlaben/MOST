@@ -4,6 +4,17 @@ import { TraktClient } from '@/lib/trakt';
 import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
+import { parseAndValidateJson } from '@/lib/request-validation';
+import { finalizeApiResponse } from '@/lib/route-response';
+
+const updateBodySchema = z.object({
+  profileId: z.string().min(1),
+  name: z.string().min(1)
+});
+
+const deleteBodySchema = z.object({
+  profileId: z.string().min(1)
+});
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const ctx = createRequestContext(request, 'api/trakt/lists/[id]');
@@ -11,35 +22,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const bodySchema = z.object({
-      profileId: z.string().min(1),
-      name: z.string().min(1)
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, updateBodySchema);
     if (!parsedBody.success) {
-      const response = NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-      timing.appendTo(response, 'trakt_list_update');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(parsedBody.errorResponse, { ctx, timing, metricName: 'trakt_list_update' });
     }
 
     const { profileId, name } = parsedBody.data;
 
     if (!profileId || !id) {
       const response = NextResponse.json({ error: 'Profile ID and List ID required' }, { status: 400 });
-      timing.appendTo(response, 'trakt_list_update');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_update' });
     }
 
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
     if (!accessToken) {
       const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
-      timing.appendTo(response, 'trakt_list_update');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_update' });
     }
 
     const trakt = new TraktClient(clientId || '', clientSecret || '', '', accessToken);
@@ -63,9 +61,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         if (!match?.ids?.slug) {
           const response = NextResponse.json({ error: 'List not found on Trakt' }, { status: 404 });
-          timing.appendTo(response, 'trakt_list_update');
-          ctx.end(response.status);
-          return response;
+          return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_update' });
         }
 
         resolvedListId = match.ids.slug;
@@ -79,15 +75,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const list = await trakt.updateList(resolvedListId, name, description, privacy);
 
     const response = NextResponse.json(list);
-    timing.appendTo(response, 'trakt_list_update');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_update' });
   } catch (error) {
     ctx.log.error('Failed to update list', error);
     const response = NextResponse.json({ error: 'Failed to update list' }, { status: 500 });
-    timing.appendTo(response, 'trakt_list_update');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_update' });
   }
 }
 
@@ -97,34 +89,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   try {
     const { id } = await params;
-    const body = await request.json();
-    const bodySchema = z.object({
-      profileId: z.string().min(1)
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, deleteBodySchema);
     if (!parsedBody.success) {
-      const response = NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-      timing.appendTo(response, 'trakt_list_delete');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(parsedBody.errorResponse, { ctx, timing, metricName: 'trakt_list_delete' });
     }
 
     const { profileId } = parsedBody.data;
 
     if (!profileId || !id) {
       const response = NextResponse.json({ error: 'Profile ID and List ID required' }, { status: 400 });
-      timing.appendTo(response, 'trakt_list_delete');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_delete' });
     }
 
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
     if (!accessToken) {
       const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
-      timing.appendTo(response, 'trakt_list_delete');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_delete' });
     }
 
     const trakt = new TraktClient(clientId || '', clientSecret || '', '', accessToken);
@@ -142,9 +122,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
           await trakt.deleteList(String(match.ids.trakt));
         } else {
           const response = NextResponse.json({ error: 'List not found on Trakt' }, { status: 404 });
-          timing.appendTo(response, 'trakt_list_delete');
-          ctx.end(response.status);
-          return response;
+          return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_delete' });
         }
       } else {
         throw error;
@@ -152,14 +130,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     const response = NextResponse.json({ success: true });
-    timing.appendTo(response, 'trakt_list_delete');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_delete' });
   } catch (error) {
     ctx.log.error('Failed to delete list', error);
     const response = NextResponse.json({ error: 'Failed to delete list' }, { status: 500 });
-    timing.appendTo(response, 'trakt_list_delete');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_list_delete' });
   }
 }

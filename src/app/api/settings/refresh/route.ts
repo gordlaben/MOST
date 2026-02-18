@@ -1,7 +1,7 @@
-
-import { NextResponse } from 'next/server';
 import { refreshCatalog, detectAndUpdateListTypes, CatalogFilters } from '@/lib/catalog';
 import { getProfile } from '@/lib/settings';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { logRouteError } from '@/lib/route-error';
 
 interface SelectedList {
   id: string;
@@ -14,12 +14,12 @@ export async function POST(request: Request) {
     const { profileId } = await request.json();
 
     if (!profileId) {
-      return NextResponse.json({ error: 'Profile ID is required' }, { status: 400 });
+      return jsonError('Profile ID is required', 400);
     }
 
     const profile = await getProfile(profileId);
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      return jsonError('Profile not found', 404);
     }
 
     // 1. Update List Types (Force Check)
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
              // We use JSON.parse so we pass an array of objects.
              await detectAndUpdateListTypes(profileId, JSON.parse(profile.selectedLists), true);
          } catch (e) {
-             console.error('Failed to update list types during refresh', e);
+           logRouteError('api/settings/refresh', 'Failed to update list types during refresh', e, { profileId });
          }
     }
 
@@ -83,10 +83,10 @@ export async function POST(request: Request) {
 
     await Promise.all(refreshPromises);
 
-    return NextResponse.json({ success: true, count: listsToRefresh.length });
+    return jsonSuccess({ success: true, count: listsToRefresh.length });
 
   } catch (error) {
-    console.error('Manual refresh failed:', error);
-    return NextResponse.json({ error: 'Refresh failed' }, { status: 500 });
+    logRouteError('api/settings/refresh', 'Manual refresh failed', error);
+    return jsonError('Refresh failed', 500);
   }
 }

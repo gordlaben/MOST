@@ -5,6 +5,17 @@ import { TraktClient } from '@/lib/trakt';
 import { createRequestContext } from '@/lib/request-logging';
 import { createServerTiming } from '@/lib/server-timing';
 import { aiSearch, aiSuggestListName } from '@/lib/ai-search';
+import { parseAndValidateJson } from '@/lib/request-validation';
+import { finalizeApiResponse } from '@/lib/route-response';
+
+const bodySchema = z.object({
+  profileId: z.string().min(1),
+  prompt: z.string().min(3),
+  type: z.enum(['movie', 'show']),
+  size: z.number().int().min(1).max(100).optional(),
+  privacy: z.enum(['private', 'friends', 'public']).optional(),
+  name: z.string().min(1).optional()
+});
 
 function clampSize(size: number) {
   const allowed = [10, 20, 50, 100];
@@ -17,22 +28,9 @@ export async function POST(request: NextRequest) {
   const timing = createServerTiming();
 
   try {
-    const body = await request.json();
-    const bodySchema = z.object({
-      profileId: z.string().min(1),
-      prompt: z.string().min(3),
-      type: z.enum(['movie', 'show']),
-      size: z.number().int().min(1).max(100).optional(),
-      privacy: z.enum(['private', 'friends', 'public']).optional(),
-      name: z.string().min(1).optional()
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, bodySchema);
     if (!parsedBody.success) {
-      const response = NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-      timing.appendTo(response, 'trakt_ai_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(parsedBody.errorResponse, { ctx, timing, metricName: 'trakt_ai_list' });
     }
 
     const { profileId, prompt, type, size, privacy, name } = parsedBody.data;
@@ -40,9 +38,7 @@ export async function POST(request: NextRequest) {
     const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
     if (!accessToken) {
       const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
-      timing.appendTo(response, 'trakt_ai_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
     }
 
     const trakt = new TraktClient(clientId || '', clientSecret || '', '', accessToken);
@@ -53,9 +49,7 @@ export async function POST(request: NextRequest) {
       const nameResult = await aiSuggestListName(prompt, profileId, type, listSize);
       if (!nameResult.usedAI || !nameResult.name) {
         const response = NextResponse.json({ error: 'AI is not configured for list creation' }, { status: 400 });
-        timing.appendTo(response, 'trakt_ai_list');
-        ctx.end(response.status);
-        return response;
+        return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
       }
       listName = nameResult.name;
     }
@@ -63,9 +57,7 @@ export async function POST(request: NextRequest) {
     const ai = await aiSearch(prompt, trakt, profileId, type, listSize);
     if (!ai.usedAI) {
       const response = NextResponse.json({ error: 'AI is not configured for list creation' }, { status: 400 });
-      timing.appendTo(response, 'trakt_ai_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
     }
 
     const items = (ai.results || [])
@@ -78,9 +70,7 @@ export async function POST(request: NextRequest) {
 
     if (items.length === 0) {
       const response = NextResponse.json({ error: 'AI returned no valid items' }, { status: 400 });
-      timing.appendTo(response, 'trakt_ai_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
     }
 
     const description = `AI Made · ${prompt}`;
@@ -96,14 +86,10 @@ export async function POST(request: NextRequest) {
       list,
       itemCount: items.length
     });
-    timing.appendTo(response, 'trakt_ai_list');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
   } catch (error) {
     ctx.log.error('Failed to create AI list', error);
     const response = NextResponse.json({ error: 'Failed to create AI list' }, { status: 500 });
-    timing.appendTo(response, 'trakt_ai_list');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_ai_list' });
   }
 }
