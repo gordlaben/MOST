@@ -3,6 +3,7 @@ import { getTraktCredentials } from '@/lib/settings';
 import { TraktClient } from '@/lib/trakt';
 import { createRequestContext } from '@/lib/request-logging';
 import { getAppConfig } from '@/lib/config';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 export async function GET(request: NextRequest) {
   const ctx = createRequestContext(request, 'api/auth/login');
@@ -15,8 +16,7 @@ export async function GET(request: NextRequest) {
   if (!clientId || !clientSecret) {
     ctx.log.error('Trakt credentials missing during login initiation');
     const response = NextResponse.json({ error: 'Trakt credentials not configured' }, { status: 400 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   const { nextPublicBaseUrl } = getAppConfig();
@@ -24,6 +24,5 @@ export async function GET(request: NextRequest) {
   const trakt = new TraktClient(clientId, clientSecret, redirectUri);
 
   const response = NextResponse.redirect(trakt.getAuthUrl(profileId || undefined));
-  ctx.end(response.status);
-  return response;
+  return finalizeApiResponse(response, { ctx });
 }

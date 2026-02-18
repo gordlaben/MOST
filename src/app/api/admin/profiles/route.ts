@@ -1,19 +1,13 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
-
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-
-function isAuthenticated(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !ADMIN_PASSWORD) return false;
-  return authHeader === ADMIN_PASSWORD;
-}
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { logRouteError } from '@/lib/route-error';
+import { isAdminRequestAuthorized } from '@/lib/route-auth';
 
 export async function GET(request: Request) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminRequestAuthorized(request)) {
+    return jsonError('Unauthorized', 401);
   }
 
   try {
@@ -40,7 +34,7 @@ export async function GET(request: Request) {
              username = userProfile.username;
            }
         } catch (e) {
-          console.error(`Failed to fetch username for profile ${profile.id}`, e);
+          logRouteError('api/admin/profiles', 'Failed to fetch profile username', e, { profileId: profile.id });
           username = 'Error fetching';
         }
       }
@@ -52,32 +46,32 @@ export async function GET(request: Request) {
       };
     }));
 
-    return NextResponse.json(profilesWithUsernames);
+    return jsonSuccess(profilesWithUsernames);
   } catch (error) {
-    console.error('Admin profiles error:', error);
-    return NextResponse.json({ error: 'Failed to fetch profiles' }, { status: 500 });
+    logRouteError('api/admin/profiles', 'Failed to fetch profiles', error);
+    return jsonError('Failed to fetch profiles', 500);
   }
 }
 
 export async function DELETE(request: Request) {
-  if (!isAuthenticated(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminRequestAuthorized(request)) {
+    return jsonError('Unauthorized', 401);
   }
 
   try {
     const { id } = await request.json();
     
     if (!id) {
-      return NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
+      return jsonError('Profile ID required', 400);
     }
 
     await prisma.profile.delete({
       where: { id }
     });
     
-    return NextResponse.json({ success: true });
+    return jsonSuccess({ success: true });
   } catch (error) {
-    console.error('Delete profile error:', error);
-    return NextResponse.json({ error: 'Failed to delete profile' }, { status: 500 });
+    logRouteError('api/admin/profiles', 'Failed to delete profile', error);
+    return jsonError('Failed to delete profile', 500);
   }
 }

@@ -6,32 +6,28 @@ import { logger } from '@/lib/logger';
 import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
+import { parseAndValidateJson } from '@/lib/request-validation';
+import { finalizeApiResponse } from '@/lib/route-response';
+
+const bodySchema = z.object({
+  profileId: z.string().min(1),
+  url: z.string().url()
+});
 
 export async function POST(request: Request) {
   const ctx = createRequestContext(request, 'api/trakt/import-list');
   const timing = createServerTiming();
   try {
-    const body = await request.json();
-    const bodySchema = z.object({
-      profileId: z.string().min(1),
-      url: z.string().url()
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, bodySchema);
     if (!parsedBody.success) {
-      const response = NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-      timing.appendTo(response, 'trakt_import_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(parsedBody.errorResponse, { ctx, timing, metricName: 'trakt_import_list' });
     }
 
     const { profileId, url } = parsedBody.data;
 
     if (!profileId || !url) {
       const response = NextResponse.json({ error: 'Missing profileId or url' }, { status: 400 });
-      timing.appendTo(response, 'trakt_import_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
     }
 
     // Parse URL
@@ -41,9 +37,7 @@ export async function POST(request: Request) {
 
     if (!match) {
       const response = NextResponse.json({ error: 'Invalid Trakt list URL' }, { status: 400 });
-      timing.appendTo(response, 'trakt_import_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
     }
 
     const username = match[1];
@@ -54,9 +48,7 @@ export async function POST(request: Request) {
 
     if (!clientId || !clientSecret || !accessToken) {
       const response = NextResponse.json({ error: 'Missing Trakt credentials' }, { status: 401 });
-      timing.appendTo(response, 'trakt_import_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
     }
 
     const trakt = new TraktClient(clientId, clientSecret, '', accessToken);
@@ -68,9 +60,7 @@ export async function POST(request: Request) {
     if (!Array.isArray(items)) {
       ctx.log.error(`getListItems returned non-array for ${listId}`, items);
       const response = NextResponse.json({ error: 'Failed to retrieve list items from Trakt. The list might be empty or inaccessible.' }, { status: 500 });
-      timing.appendTo(response, 'trakt_import_list');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
     }
 
     let hasMovies = false;
@@ -120,15 +110,11 @@ export async function POST(request: Request) {
       username, // Return username so we can store it
       content_type: contentType
     });
-    timing.appendTo(response, 'trakt_import_list');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
 
   } catch (error) {
     console.error('Error importing list:', error);
     const response = NextResponse.json({ error: 'Failed to import list' }, { status: 500 });
-    timing.appendTo(response, 'trakt_import_list');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
   }
 }

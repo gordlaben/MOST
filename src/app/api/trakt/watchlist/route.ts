@@ -1,7 +1,6 @@
 
 import { NextResponse } from 'next/server';
-import { TraktClient } from '@/lib/trakt';
-import { getTraktCredentials } from '@/lib/settings';
+import { getAuthorizedTraktClient } from '@/lib/route-auth';
 
 export async function POST(request: Request) {
   try {
@@ -12,12 +11,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
-    const { clientId, clientSecret, accessToken } = await getTraktCredentials(profileId);
-    if (!clientId || !clientSecret || !accessToken) {
-      return NextResponse.json({ error: 'Missing Trakt credentials' }, { status: 401 });
+    const authResult = await getAuthorizedTraktClient(profileId, {
+      requireClientCredentials: true,
+      notConnectedMessage: 'Missing Trakt credentials',
+      missingCredentialsMessage: 'Missing Trakt credentials',
+      includeProfileId: true,
+    });
+    if ('errorResponse' in authResult) {
+      return authResult.errorResponse;
     }
 
-    const trakt = new TraktClient(clientId, clientSecret, '', accessToken, profileId);
+    const trakt = authResult.client;
 
     let result;
     if (action === 'add') {

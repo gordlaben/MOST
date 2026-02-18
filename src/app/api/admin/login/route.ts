@@ -1,20 +1,20 @@
-import { NextResponse } from 'next/server';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { isAdminPasswordConfigured, isAdminPasswordValid } from '@/lib/route-auth';
 
 export async function POST(request: Request) {
   try {
     const { password } = await request.json();
-    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-    if (!ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Admin password not configured' }, { status: 500 });
+    if (!isAdminPasswordConfigured()) {
+      return jsonError('Admin password not configured', 500);
     }
 
-    if (password === ADMIN_PASSWORD) {
-      return NextResponse.json({ success: true });
+    if (isAdminPasswordValid(password)) {
+      return jsonSuccess({ success: true });
     }
     
-    return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
+    return jsonError('Invalid password', 401);
   } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+    return jsonError('Invalid request', 400);
   }
 }

@@ -4,6 +4,7 @@ import { createRequestContext } from '@/lib/request-logging';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 const IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
 
@@ -74,12 +75,10 @@ export async function GET(request: Request) {
     }
 
     const response = NextResponse.json({ success: true, message: 'Cleanup completed' });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   } catch (error) {
     ctx.log.error('Cleanup job failed', error);
     const response = NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 }

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { logRouteError } from '@/lib/route-error';
 
 export async function POST() {
   try {
@@ -15,9 +16,9 @@ export async function POST() {
     // Clear cache as it belongs to the user
     await prisma.calendarCache.deleteMany({});
 
-    return NextResponse.json({ success: true });
+    return jsonSuccess({ success: true });
   } catch (error) {
-    console.error('Logout failed:', error);
-    return NextResponse.json({ error: 'Logout failed' }, { status: 500 });
+    logRouteError('api/auth/logout', 'Logout failed', error);
+    return jsonError('Logout failed', 500);
   }
 }

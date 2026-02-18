@@ -5,6 +5,8 @@ import { createRequestContext } from '@/lib/request-logging';
 import { z } from 'zod';
 import { createServerTiming } from '@/lib/server-timing';
 import { aiSearch } from '@/lib/ai-search';
+import { validateQuery } from '@/lib/request-validation';
+import { finalizeApiResponse } from '@/lib/route-response';
 
 function inferSearchType(query: string): 'movie' | 'show' | undefined {
   const q = query.toLowerCase();
@@ -63,24 +65,19 @@ export async function GET(request: NextRequest) {
     query: z.string().optional()
   });
 
-  const parsed = querySchema.safeParse({ profileId, query });
+  const parsed = validateQuery(querySchema, { profileId, query });
   if (!parsed.success) {
-    const response = NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
-    timing.appendTo(response, 'trakt_search');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(parsed.errorResponse, { ctx, timing, metricName: 'trakt_search' });
   }
 
   if (!profileId) {
     const response = NextResponse.json({ error: 'Profile ID required' }, { status: 400 });
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx });
   }
 
   if (!query) {
       const response = NextResponse.json({ results: [] });
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx });
   }
 
   try {
@@ -88,9 +85,7 @@ export async function GET(request: NextRequest) {
 
     if (!accessToken) {
       const response = NextResponse.json({ error: 'Not connected to Trakt' }, { status: 401 });
-      timing.appendTo(response, 'trakt_search');
-      ctx.end(response.status);
-      return response;
+      return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_search' });
     }
 
     const trakt = new TraktClient(
@@ -143,14 +138,10 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.json({ results });
-    timing.appendTo(response, 'trakt_search');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_search' });
   } catch (error) {
     ctx.log.error('Failed to search trakt', error);
     const response = NextResponse.json({ error: 'Failed to search' }, { status: 500 });
-    timing.appendTo(response, 'trakt_search');
-    ctx.end(response.status);
-    return response;
+    return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_search' });
   }
 }

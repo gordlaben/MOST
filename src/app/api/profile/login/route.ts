@@ -1,38 +1,39 @@
-import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { verifyPassword, createSessionToken } from '@/lib/auth';
 import { z } from 'zod';
+import { jsonError, jsonSuccess } from '@/lib/http-response';
+import { logRouteError } from '@/lib/route-error';
+import { parseAndValidateJson } from '@/lib/request-validation';
+
+const bodySchema = z.object({
+  id: z.string().min(1),
+  password: z.string().min(1)
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const bodySchema = z.object({
-      id: z.string().min(1),
-      password: z.string().min(1)
-    });
-
-    const parsedBody = bodySchema.safeParse(body);
+    const parsedBody = await parseAndValidateJson(request, bodySchema);
     if (!parsedBody.success) {
-      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+      return parsedBody.errorResponse;
     }
 
     const { id, password } = parsedBody.data;
 
     if (!id || !password) {
-      return NextResponse.json({ error: 'ID and password are required' }, { status: 400 });
+      return jsonError('ID and password are required', 400);
     }
 
     const profile = await prisma.profile.findUnique({ where: { id } });
 
     if (!profile || !(await verifyPassword(password, profile.password))) {
-      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+      return jsonError('Invalid credentials', 401);
     }
 
     const token = await createSessionToken(profile.id);
 
-    return NextResponse.json({ token });
+    return jsonSuccess({ token });
   } catch (error) {
-    console.error('Error logging in:', error);
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
+    logRouteError('api/profile/login', 'Login failed', error);
+    return jsonError('Login failed', 500);
   }
 }
