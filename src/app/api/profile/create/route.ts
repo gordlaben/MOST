@@ -5,12 +5,18 @@ import { z } from 'zod';
 import { jsonError, jsonSuccess } from '@/lib/http-response';
 import { logRouteError } from '@/lib/route-error';
 import { parseAndValidateJson } from '@/lib/request-validation';
+import { rateLimit, getRateLimitKey } from '@/lib/rate-limit';
 
 const bodySchema = z.object({
-  password: z.string().min(1)
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128)
 });
 
 export async function POST(request: Request) {
+  const rl = rateLimit(getRateLimitKey(request, 'profile-create'), { limit: 5, windowMs: 60_000 });
+  if (!rl.allowed) {
+    return jsonError('Too many registration attempts. Try again later.', 429);
+  }
+
   try {
     // Check if registration is enabled
     if (process.env.ENABLE_REGISTRATION === 'false') {

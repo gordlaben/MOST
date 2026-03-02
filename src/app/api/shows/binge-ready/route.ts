@@ -164,7 +164,7 @@ export async function GET(request: NextRequest) {
           safeEnqueue(JSON.stringify(result) + '\n');
           safeClose();
         } catch (e) {
-          console.error('Error in stream:', e);
+          logger.error('Error in binge-ready stream:', e);
           safeError(e);
         }
       }
@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
     });
     return finalizeApiResponse(response, { ctx });
   } catch (error) {
-    console.error('Error fetching binge ready shows:', error);
+    logger.error('Error fetching binge ready shows:', error);
     const response = NextResponse.json({ error: 'Failed to fetch shows' }, { status: 500 });
     return finalizeApiResponse(response, { ctx });
   }

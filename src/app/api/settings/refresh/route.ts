@@ -2,6 +2,8 @@ import { refreshCatalog, detectAndUpdateListTypes, CatalogFilters } from '@/lib/
 import { getProfile } from '@/lib/settings';
 import { jsonError, jsonSuccess } from '@/lib/http-response';
 import { logRouteError } from '@/lib/route-error';
+import { z } from 'zod';
+import { parseAndValidateJson } from '@/lib/request-validation';
 
 interface SelectedList {
   id: string;
@@ -9,13 +11,15 @@ interface SelectedList {
   owner?: string;
 }
 
+const bodySchema = z.object({
+  profileId: z.string().min(1),
+});
+
 export async function POST(request: Request) {
   try {
-    const { profileId } = await request.json();
-
-    if (!profileId) {
-      return jsonError('Profile ID is required', 400);
-    }
+    const parsed = await parseAndValidateJson(request, bodySchema);
+    if (!parsed.success) return parsed.errorResponse;
+    const { profileId } = parsed.data;
 
     const profile = await getProfile(profileId);
     if (!profile) {

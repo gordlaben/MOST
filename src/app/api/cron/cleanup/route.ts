@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { createRequestContext } from '@/lib/request-logging';
+import { isAdminRequestAuthorized } from '@/lib/route-auth';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -10,6 +11,12 @@ const IMAGES_DIR = path.join(process.cwd(), 'data', 'images');
 
 export async function GET(request: Request) {
   const ctx = createRequestContext(request, 'api/cron/cleanup');
+
+  if (!isAdminRequestAuthorized(request)) {
+    const response = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return finalizeApiResponse(response, { ctx });
+  }
+
   try {
     ctx.log.info('Starting cleanup job');
 

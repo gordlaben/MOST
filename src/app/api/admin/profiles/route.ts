@@ -4,6 +4,8 @@ import { getTraktCredentials } from '@/lib/settings';
 import { jsonError, jsonSuccess } from '@/lib/http-response';
 import { logRouteError } from '@/lib/route-error';
 import { isAdminRequestAuthorized } from '@/lib/route-auth';
+import { z } from 'zod';
+import { parseAndValidateJson } from '@/lib/request-validation';
 
 export async function GET(request: Request) {
   if (!isAdminRequestAuthorized(request)) {
@@ -31,7 +33,7 @@ export async function GET(request: Request) {
              // We create a client with the user's access token
              const trakt = new TraktClient(clientId, clientSecret, '', profile.traktAccessToken);
              const userProfile = await trakt.getUserProfile();
-             username = userProfile.username;
+             username = userProfile?.username || 'Unknown';
            }
         } catch (e) {
           logRouteError('api/admin/profiles', 'Failed to fetch profile username', e, { profileId: profile.id });
@@ -58,12 +60,15 @@ export async function DELETE(request: Request) {
     return jsonError('Unauthorized', 401);
   }
 
+  const deleteSchema = z.object({ id: z.string().min(1) });
+
   try {
-    const { id } = await request.json();
-    
-    if (!id) {
-      return jsonError('Profile ID required', 400);
+    const parsedBody = await parseAndValidateJson(request, deleteSchema);
+    if (!parsedBody.success) {
+      return parsedBody.errorResponse;
     }
+
+    const { id } = parsedBody.data;
 
     await prisma.profile.delete({
       where: { id }

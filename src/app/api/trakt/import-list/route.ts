@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
 
   } catch (error) {
-    console.error('Error importing list:', error);
+    logger.error('Error importing list:', error);
     const response = NextResponse.json({ error: 'Failed to import list' }, { status: 500 });
     return finalizeApiResponse(response, { ctx, timing, metricName: 'trakt_import_list' });
   }

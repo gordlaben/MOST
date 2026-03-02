@@ -177,14 +177,17 @@ export async function GET(
             // 1. Get List of seasons (basic info)
             const seasons = await trakt.getShowSeasons(content.ids.trakt.toString(), false);
             
-            // 2. Fetch full episode details for each season in parallel
-            // We use Promise.all to fetch all seasons at once. Trakt rate limit should handle typical show size.
-            // For huge shows (e.g. 50 seasons), this might be heavy, but standard usage is fine.
-            const seasonsPromises = seasons
-                .filter(s => s.number > 0) // Skip specials if you want, or keep them. Stremio usually handles season 0.
-                .map(s => trakt.getSeasonEpisodes(content.ids.trakt.toString(), s.number, true));
-            
-            const allSeasonsEpisodes = await Promise.all(seasonsPromises);
+            // 2. Fetch episode details with concurrency limit to avoid overloading the API
+            const filteredSeasons = seasons.filter(s => s.number > 0);
+            const CONCURRENCY = 5;
+            const allSeasonsEpisodes: Awaited<ReturnType<typeof trakt.getSeasonEpisodes>>[] = [];
+            for (let i = 0; i < filteredSeasons.length; i += CONCURRENCY) {
+              const batch = filteredSeasons.slice(i, i + CONCURRENCY);
+              const results = await Promise.all(
+                batch.map(s => trakt.getSeasonEpisodes(content.ids.trakt.toString(), s.number, true))
+              );
+              allSeasonsEpisodes.push(...results);
+            }
             
             // 3. Flat map all episodes into the videos array
             for (const seasonEpisodes of allSeasonsEpisodes) {

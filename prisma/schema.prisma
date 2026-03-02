@@ -75,6 +75,7 @@ model Season {
   episodes  Episode[]
 
   @@unique([showId, number])
+  @@index([showId])
 }
 
 model Episode {
@@ -87,6 +88,7 @@ model Episode {
   ids        String    // JSON string to store various IDs if needed
 
   @@unique([seasonId, number])
+  @@index([seasonId])
 }
 
 model CalendarCache {
@@ -151,6 +153,7 @@ model TraktListItem {
   episodeNumber Int?
 
   @@unique([listId, type, showId, movieId, seasonNumber, episodeNumber])
+  @@index([listId])
   @@index([showId])
   @@index([movieId])
 }
@@ -177,4 +180,5 @@ model WatchedEntry {
   @@unique([profileId, showId, seasonNumber, episodeNumber])
   @@unique([profileId, movieId]) // For movies, one entry per profile per movie usually sufficient, or we track plays
   @@index([profileId, showId])
+  @@index([profileId, lastWatchedAt])
 }

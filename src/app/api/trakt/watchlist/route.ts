@@ -1,15 +1,22 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthorizedTraktClient } from '@/lib/route-auth';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { parseAndValidateJson } from '@/lib/request-validation';
+
+const bodySchema = z.object({
+  profileId: z.string().min(1),
+  item: z.object({ ids: z.record(z.unknown()) }).passthrough(),
+  type: z.enum(['show', 'movie']),
+  action: z.enum(['add', 'remove']),
+});
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { profileId, item, type, action } = body;
-
-    if (!profileId || !item || !type || !action) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
-    }
+    const parsed = await parseAndValidateJson(request, bodySchema);
+    if (!parsed.success) return parsed.errorResponse;
+    const { profileId, item, type, action } = parsed.data;
 
     const authResult = await getAuthorizedTraktClient(profileId, {
       requireClientCredentials: true,
@@ -34,7 +41,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Watchlist API error', error);
+    logger.error('Watchlist API error', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

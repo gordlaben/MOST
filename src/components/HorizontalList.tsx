@@ -80,12 +80,12 @@ const HorizontalList = memo(function HorizontalList({
     useEffect(() => {
         if (compactMode) {
             setAllowOverflow(false);
-        } else {
-            const timer = setTimeout(() => {
-                setAllowOverflow(true);
-            }, 500);
-            return () => clearTimeout(timer);
+            return;
         }
+        const timer = setTimeout(() => {
+            setAllowOverflow(true);
+        }, 500);
+        return () => clearTimeout(timer);
     }, [compactMode]);
 
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -130,30 +130,30 @@ const HorizontalList = memo(function HorizontalList({
 
         useEffect(() => {
             const el = scrollContainerRef.current;
-            if (el) {
-                const handleScroll = () => {
-                    requestAnimationFrame(checkScroll);
-                };
-                const handleResize = () => handleScroll();
+            if (!el) return;
 
-                el.addEventListener('scroll', handleScroll, { passive: true });
-                window.addEventListener('resize', handleResize);
+            const handleScroll = () => {
+                requestAnimationFrame(checkScroll);
+            };
+            const handleResize = () => handleScroll();
 
-                const resizeObserver = new ResizeObserver(() => {
-                    handleScroll();
-                });
-                resizeObserver.observe(el);
+            el.addEventListener('scroll', handleScroll, { passive: true });
+            window.addEventListener('resize', handleResize);
 
+            const resizeObserver = new ResizeObserver(() => {
                 handleScroll();
-                const timer = setTimeout(handleScroll, 600);
+            });
+            resizeObserver.observe(el);
 
-                return () => {
-                    el.removeEventListener('scroll', handleScroll);
-                    window.removeEventListener('resize', handleResize);
-                    resizeObserver.disconnect();
-                    clearTimeout(timer);
-                };
-            }
+            handleScroll();
+            const timer = setTimeout(handleScroll, 600);
+
+            return () => {
+                el.removeEventListener('scroll', handleScroll);
+                window.removeEventListener('resize', handleResize);
+                resizeObserver.disconnect();
+                clearTimeout(timer);
+            };
         }, [items, loading, compactMode, allowOverflow]);
 
         useEffect(() => {
@@ -179,6 +179,8 @@ const HorizontalList = memo(function HorizontalList({
                 setLoading(false);
             }
 
+            const controller = new AbortController();
+
             const fetchItems = async () => {
                 if (!cached) setLoading(true);
                 try {
@@ -195,22 +197,25 @@ const HorizontalList = memo(function HorizontalList({
                     if (type) {
                         url += `&type=${type}`;
                     }
-                    const res = await fetch(url);
+                    const res = await fetch(url, { signal: controller.signal });
                     if (res.ok) {
                         const data = await res.json();
                         setItems(data);
                         cacheRef.current[cacheKey] = data;
                     }
                 } catch (error) {
+                    if (error instanceof DOMException && error.name === 'AbortError') return;
                     console.error('Failed to fetch list items', error);
                 } finally {
-                    setLoading(false);
+                    if (!controller.signal.aborted) setLoading(false);
                 }
             };
 
             if (profileId) {
                 fetchItems();
             }
+
+            return () => controller.abort();
         }, [profileId, version, sortBy, filters, inView, cacheKey, type, listItems]);
 
         useEffect(() => {

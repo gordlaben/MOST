@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { TraktClient } from '@/lib/trakt';
 import { getTraktCredentials } from '@/lib/settings';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     const [data, watchlistItems] = await Promise.all([
         trakt.getContent(contentType, id),
         trakt.getListItems('watchlist', 'me').catch((e) => {
-             console.error('Failed to check watchlist status', e);
+             logger.error('Failed to check watchlist status', e);
              return [];
         })
     ]);
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ ...data, inWatchlist });
   } catch (error) {
-    console.error('Error fetching item info:', error);
+    logger.error('Error fetching item info:', error);
     return NextResponse.json({ error: 'Failed to fetch info' }, { status: 500 });
   }
 }

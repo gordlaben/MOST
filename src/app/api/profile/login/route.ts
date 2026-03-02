@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { jsonError, jsonSuccess } from '@/lib/http-response';
 import { logRouteError } from '@/lib/route-error';
 import { parseAndValidateJson } from '@/lib/request-validation';
+import { rateLimit, getRateLimitKey } from '@/lib/rate-limit';
 
 const bodySchema = z.object({
   id: z.string().min(1),
@@ -11,6 +12,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const rl = rateLimit(getRateLimitKey(request, 'profile-login'), { limit: 10, windowMs: 60_000 });
+  if (!rl.allowed) {
+    return jsonError('Too many login attempts. Try again later.', 429);
+  }
+
   try {
     const parsedBody = await parseAndValidateJson(request, bodySchema);
     if (!parsedBody.success) {

@@ -31,8 +31,8 @@ describe('route auth helpers', () => {
 
     expect('errorResponse' in result).toBe(true);
     if ('errorResponse' in result) {
-      expect(result.errorResponse.status).toBe(401);
-      await expect(result.errorResponse.json()).resolves.toEqual({ error: 'Not connected to Trakt' });
+      expect(result.errorResponse!.status).toBe(401);
+      await expect(result.errorResponse!.json()).resolves.toEqual({ error: 'Not connected to Trakt' });
     }
   });
 

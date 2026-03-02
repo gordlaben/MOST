@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import crypto from 'crypto';
+import { logger } from '@/lib/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, url });
   } catch (error) {
-    console.error('Upload failed:', error);
+    logger.error('Upload failed:', error);
     return NextResponse.json({ success: false, message: 'Upload failed' }, { status: 500 });
   }
 }

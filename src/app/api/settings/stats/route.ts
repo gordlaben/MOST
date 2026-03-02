@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { CatalogItem } from '@/lib/catalog';
+import { verifySessionToken } from '@/lib/auth';
 
 type ContentIds = { trakt?: number; imdb?: string; tmdb?: number };
 type ContentWithIds = { ids?: ContentIds; type?: 'movie' | 'show' };
@@ -29,6 +30,16 @@ export async function GET(request: Request) {
 
   if (!profileId) {
     return NextResponse.json({ error: 'Profile ID is required' }, { status: 400 });
+  }
+
+  // Verify the requesting user owns this profile
+  const cookie = request.headers.get('cookie');
+  const token = cookie?.match(/session=([^;]+)/)?.[1];
+  if (token) {
+    const session = await verifySessionToken(token);
+    if (!session || session.profileId !== profileId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   // Get all cache entries for this profile

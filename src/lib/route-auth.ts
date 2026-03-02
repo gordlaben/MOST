@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'crypto';
 import { getTraktCredentials } from '@/lib/settings';
 import { TraktClient } from '@/lib/trakt';
 import { jsonError } from '@/lib/http-response';
@@ -45,7 +46,10 @@ export function isAdminPasswordConfigured() {
 
 export function isAdminPasswordValid(password: string | undefined | null) {
   if (!password || !process.env.ADMIN_PASSWORD) return false;
-  return password === process.env.ADMIN_PASSWORD;
+  const a = Buffer.from(password);
+  const b = Buffer.from(process.env.ADMIN_PASSWORD);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 export function isAdminRequestAuthorized(request: Request) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import { cacheImage, getImageMetaIfCached } from '@/lib/images';
+import { logger } from '@/lib/logger';
 
 // Helper to convert Node stream to Web stream
 function nodeStreamToWeb(nodeStream: fs.ReadStream): ReadableStream {
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(fallback || url, 307); 
 
   } catch (error) {
-    console.error('Error proxying image:', error);
+    logger.error('Error proxying image:', error);
     // Fallback to strict redirect if anything blows up
     return NextResponse.redirect(fallback || url, 307);
   }

@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
           safeEnqueue(JSON.stringify(result) + '\n');
           safeClose();
         } catch (e) {
-          console.error('Error in stream:', e);
+          logger.error('Error in episodes-left stream:', e);
           safeError(e);
         }
       }
@@ -175,7 +175,7 @@ export async function GET(request: NextRequest) {
     });
     return finalizeApiResponse(response, { ctx });
   } catch (error) {
-    console.error('Failed to fetch episodes left shows:', error);
+    logger.error('Failed to fetch episodes left shows:', error);
     const response = NextResponse.json({ error: 'Failed to fetch shows' }, { status: 500 });
     return finalizeApiResponse(response, { ctx });
   }

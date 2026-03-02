@@ -218,8 +218,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { profileId, action } = body as { profileId?: string; action?: string };
+  let body: { profileId?: string; action?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+  }
+  const { profileId, action } = body;
 
   if (!profileId) {
     return NextResponse.json({ error: 'Profile ID is required' }, { status: 400 });

@@ -2,10 +2,25 @@ import { NextResponse } from 'next/server';
 import { getTraktCredentials } from '@/lib/settings';
 import { TraktClient } from '@/lib/trakt';
 import { prisma } from '@/lib/db';
+import { verifySessionToken } from '@/lib/auth';
+import { logger } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const profileId = searchParams.get('profileId') || undefined;
+
+  // Verify the requesting user owns this profile
+  if (profileId) {
+    const cookie = request.headers.get('cookie');
+    const token = cookie?.match(/session=([^;]+)/)?.[1];
+    if (token) {
+      const session = await verifySessionToken(token);
+      if (!session || session.profileId !== profileId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    }
+  }
+
   const cacheKey = `user-stats-${profileId || 'default'}`;
 
   // Check cache first (1 hour TTL)
@@ -65,7 +80,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error fetching stats:', error);
+    logger.error('Error fetching stats:', error);
     return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
   }
 }

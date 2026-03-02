@@ -11,6 +11,9 @@ const DEFAULT_TIMEOUT_MS = 15000; // 15 seconds timeout
 const DEFAULT_RETRY_COUNT = 0; // No retries by default (behavior unchanged)
 const DEFAULT_RETRY_DELAY_MS = 250;
 
+// Module-level lock to deduplicate concurrent token refreshes per profile
+const tokenRefreshLocks: Map<string, Promise<{ access_token: string; refresh_token: string; expires_in: number } | null>> = new Map();
+
 interface TraktImage {
     full: string;
     medium: string;
@@ -291,55 +294,59 @@ export class TraktClient {
     try {
       throw lastError;
     } catch (error) {
-      // Handle 401 Unauthorized by attempting to refresh token
+      // Handle 401 Unauthorized by attempting to refresh token (with dedup lock)
       if (axios.isAxiosError(error) && error.response?.status === 401 && this.profileId) {
         logger.warn(`Received 401 for ${url}. Attempting token refresh for profile ${this.profileId}...`);
         try {
-          const profile = await prisma.profile.findUnique({ where: { id: this.profileId } });
-          if (profile && profile.traktRefreshToken) {
-             const newTokens = await this.refreshAccessToken(profile.traktRefreshToken);
-             
-             if (newTokens && newTokens.access_token) {
-                 // Update DB
-                 const now = Math.floor(Date.now() / 1000);
-                 const newExpiresAt = (now + newTokens.expires_in).toString();
-                 
-                 await prisma.profile.update({
-                     where: { id: this.profileId },
-                     data: {
-                         traktAccessToken: newTokens.access_token,
-                         traktRefreshToken: newTokens.refresh_token,
-                         traktExpiresAt: newExpiresAt
-                     }
-                 });
+          const pid = this.profileId;
+          let refreshPromise = tokenRefreshLocks.get(pid);
 
-                 // Update this instance
-                 this.accessToken = newTokens.access_token;
-                 
-                 // Retry request with new token
-                 // Re-generate headers to include new token
-                 const retryConfig = this.buildAxiosConfig(config);
+          if (!refreshPromise) {
+            // No concurrent refresh in progress — start one
+            refreshPromise = (async () => {
+              const profile = await prisma.profile.findUnique({ where: { id: pid } });
+              if (!profile?.traktRefreshToken) return null;
+              const newTokens = await this.refreshAccessToken(profile.traktRefreshToken);
+              if (!newTokens?.access_token) return null;
+              const now = Math.floor(Date.now() / 1000);
+              await prisma.profile.update({
+                where: { id: pid },
+                data: {
+                  traktAccessToken: newTokens.access_token,
+                  traktRefreshToken: newTokens.refresh_token,
+                  traktExpiresAt: (now + newTokens.expires_in).toString()
+                }
+              });
+              return newTokens;
+            })();
+            tokenRefreshLocks.set(pid, refreshPromise);
+            refreshPromise.finally(() => tokenRefreshLocks.delete(pid));
+          }
 
-                 logger.info(`Token refresh successful, retrying request...`);
-                 if (method === 'get') {
-                    const response = await axios.get(url, retryConfig);
-                    return response.data;
-                  }
-                  if (method === 'put') {
-                    const response = await axios.put(url, data, retryConfig);
-                    return response.data;
-                  }
-                  if (method === 'delete') {
-                    const response = await axios.delete(url, { ...retryConfig, data });
-                    return response.data;
-                  }
-                  const response = await axios.post(url, data, retryConfig);
-                  return response.data;
-             }
+          const newTokens = await refreshPromise;
+
+          if (newTokens) {
+            this.accessToken = newTokens.access_token;
+            const retryConfig = this.buildAxiosConfig(config);
+
+            logger.info(`Token refresh successful, retrying request...`);
+            if (method === 'get') {
+              const response = await axios.get(url, retryConfig);
+              return response.data;
+            }
+            if (method === 'put') {
+              const response = await axios.put(url, data, retryConfig);
+              return response.data;
+            }
+            if (method === 'delete') {
+              const response = await axios.delete(url, { ...retryConfig, data });
+              return response.data;
+            }
+            const response = await axios.post(url, data, retryConfig);
+            return response.data;
           }
         } catch (refreshError) {
             logger.error(`Token refresh failed during recovery`, refreshError);
-            // Fall through to throw original error
         }
       }
       throw error;
@@ -1590,7 +1597,7 @@ export class TraktClient {
 
       return getBingeReadyStatusFromSeasons(seasons);
     } catch (error) {
-      console.error(`Error checking binge status for ${showId}:`, error);
+      logger.error(`Error checking binge status for ${showId}:`, error);
       return { isReady: false, releaseDate: null, lastEpisode: null, season: null };
     }
   }
@@ -1816,7 +1823,7 @@ export class TraktClient {
                 };
             }
         } catch (e) {
-            console.error(`Error processing show ${show.title}`, e);
+            logger.error(`Error processing show ${show.title}`, e);
         }
         return null;
       });

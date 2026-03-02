@@ -270,13 +270,13 @@ export async function GET(
     const profile = await getProfile(profileId);
     if (profile) {
       if (profile.filters) {
-        const savedFilters = JSON.parse(profile.filters);
-        filters = { ...filters, ...savedFilters };
-        
-        // Override sortBy with per-list preference
-           if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
-             filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
-        }
+        try {
+          const savedFilters = JSON.parse(profile.filters);
+          filters = { ...filters, ...savedFilters };
+          if (savedFilters.sortPreferences && savedFilters.sortPreferences[catalogId]) {
+            filters.sortBy = savedFilters.sortPreferences[catalogId] as 'newest' | 'oldest' | 'title' | 'title_z_a' | 'rating_desc' | 'rating_asc' | 'random';
+          }
+        } catch { /* ignore corrupt filters */ }
       }
       if (profile.rpdbKey) {
         rpdbKey = profile.rpdbKey;
@@ -293,8 +293,8 @@ export async function GET(
         }
       }
     } else {
-        // Profile not found
-        return NextResponse.json({ metas: [] }, { headers: { 'Access-Control-Allow-Origin': '*' } });
+        logger.warn(`Stremio catalog: profile ${profileId} not found`);
+        return NextResponse.json({ metas: [] }, { status: 404, headers: { 'Access-Control-Allow-Origin': '*' } });
     }
   }
 

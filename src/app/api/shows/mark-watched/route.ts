@@ -1,10 +1,21 @@
 import { removeShowSlugFromSystemCaches } from '@/lib/show-cache';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizedTraktClient } from '@/lib/route-auth';
+import { logger } from '@/lib/logger';
+import { z } from 'zod';
+import { parseAndValidateJson } from '@/lib/request-validation';
+
+const bodySchema = z.object({
+  showId: z.string().min(1),
+  seasonNumber: z.number().int().optional(),
+  profileId: z.string().min(1),
+  type: z.enum(['show', 'movie']).optional(),
+});
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const { showId, seasonNumber, profileId, type } = body;
+  const parsed = await parseAndValidateJson(request, bodySchema);
+  if (!parsed.success) return parsed.errorResponse;
+  const { showId, seasonNumber, profileId, type } = parsed.data;
 
   const authResult = await getAuthorizedTraktClient(profileId, {
     notConnectedMessage: 'Not connected to Trakt'
@@ -14,10 +25,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    if (!showId) {
-      return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
-    }
-
     const trakt = authResult.client;
 
     let result;
@@ -34,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error marking watched:', error);
+    logger.error('Error marking watched:', error);
     return NextResponse.json({ error: 'Failed to mark as watched' }, { status: 500 });
   }
 }

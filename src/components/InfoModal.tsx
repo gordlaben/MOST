@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import type { TraktShow, TraktMovie, TraktList } from '@/lib/trakt';
 import { formatDate, type DateFormat } from '@/lib/date-format';
@@ -45,6 +45,20 @@ export default function InfoModal({
   const [loadingUserLists, setLoadingUserLists] = useState(false);
   const [addingToListId, setAddingToListId] = useState<string | number | null>(null);
   const [listsFetched, setListsFetched] = useState(false);
+
+  // Escape key handler
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, handleKeyDown]);
 
   const openSaveMenu = async () => {
     setShowSaveMenu(!showSaveMenu);
@@ -244,7 +258,13 @@ export default function InfoModal({
     : null);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-lg p-4 animate-in fade-in duration-300">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-lg p-4 animate-in fade-in duration-300"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="info-modal-title"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
        {/* Close Button */}
        <button 
          onClick={onClose}
@@ -292,7 +312,7 @@ export default function InfoModal({
              {/* Info */}
              <div className="flex-1 space-y-4">
                  <div>
-                     <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">{title} <span className="text-gray-500 font-normal text-xl md:text-3xl">({year})</span></h2>
+                     <h2 id="info-modal-title" className="text-2xl md:text-4xl font-bold text-white mb-2">{title} <span className="text-gray-500 font-normal text-xl md:text-3xl">({year})</span></h2>
                      
                      <div className="flex flex-wrap items-center gap-3 text-sm font-bold text-gray-400">
                          {rating && (

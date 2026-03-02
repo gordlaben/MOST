@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { z } from 'zod';
 import { jsonError, jsonSuccess } from '@/lib/http-response';
 import { parseAndValidateJson } from '@/lib/request-validation';
+import { logger } from '@/lib/logger';
 
 const filtersSchema = z.object({
   includeEnded: z.boolean().optional(),
@@ -52,17 +53,21 @@ export async function GET(request: Request) {
       if (profile.rpdbKey) rpdbKey = profile.rpdbKey;
       if (profile.geminiKey) geminiKey = profile.geminiKey;
       if (profile.filters) {
-        const filters = JSON.parse(profile.filters);
-        includeEnded = filters.includeEnded;
-        includeCanceled = filters.includeCanceled;
-        includeReturning = filters.includeReturning;
-        sortBy = filters.sortBy || 'newest';
-        sortPreferences = filters.sortPreferences || {};
-        if (filters.dateFormat) dateFormat = filters.dateFormat;
-        if (filters.geminiModel) geminiModel = filters.geminiModel;
+        try {
+          const filters = JSON.parse(profile.filters);
+          includeEnded = filters.includeEnded;
+          includeCanceled = filters.includeCanceled;
+          includeReturning = filters.includeReturning;
+          sortBy = filters.sortBy || 'newest';
+          sortPreferences = filters.sortPreferences || {};
+          if (filters.dateFormat) dateFormat = filters.dateFormat;
+          if (filters.geminiModel) geminiModel = filters.geminiModel;
+        } catch (e) { logger.debug('Corrupt profile filters, using defaults', e); }
       }
       if (profile.selectedLists) {
-        selectedLists = JSON.parse(profile.selectedLists);
+        try {
+          selectedLists = JSON.parse(profile.selectedLists);
+        } catch (e) { logger.debug('Corrupt profile selectedLists, using defaults', e); }
       }
     }
   }
@@ -131,7 +136,10 @@ export async function POST(request: Request) {
     if (selectedLists !== undefined) updateData.selectedLists = JSON.stringify(selectedLists);
 
     // Merge filters
-    let currentFilters = profile.filters ? JSON.parse(profile.filters) : {};
+    let currentFilters: Record<string, unknown> = {};
+    if (profile.filters) {
+      try { currentFilters = JSON.parse(profile.filters); } catch (e) { logger.debug('Corrupt filters during save, resetting', e); }
+    }
     
     if (filters) {
       currentFilters = { ...currentFilters, ...filters };
